@@ -1,0 +1,81 @@
+pro IRCS_make_figs, chi2_dof, trial_soln, trial_lsf, oversamp, npix_lsf, int_obs, int_model, npix_trim_start, npix_trim_end
+
+
+;get rms
+residuals=int_obs-int_model
+
+rmse=sqrt(residuals[npix_trim_start:-1*npix_trim_end+1]^2)/(npix-npix_trim_start-npix_trim_end) ;FIX
+
+
+title_str="NH3 Model Fitting Process | chi2/degree of freedom : "+strtrim(chi2_dof,2)
+phi=findgen(32)*(!PI*2/32.)
+phi = [ phi, phi(0) ]
+usersym, cos(phi), sin(phi), /fill
+
+
+
+set_plot, 'ps'
+device, /encapsulated, filename = 'fit_temp.eps'
+!p.font=0
+device, /color, bits=8
+loadct, 12
+
+
+!p.multi=[0,1,2]
+
+
+plot, trial_soln, int_obs, /xs, title=title_str,xtitle="Wavelength (microns)", thick=5.0, xr=[2.31,2.33], yr=[0.4,1.1]
+
+;oplot, trial_soln[dindgen(npix/3)*3], int_model[dindgen(npix/3)*3], ps=8, symsize=0.6, color=200 
+oplot, trial_soln, int_model, ps=8, symsize=0.4, color=200 
+oplot, trial_soln, residuals+0.6, ps=8, symsize=0.2
+al_legend, ['NH3 observed', 'NH3 model', 'Residuals'], psym=[-0,88,88], color=['black','red','black']
+xyouts,2.32, 0.56, 'RMS : '+strtrim(rmse,2)
+
+device, /close
+
+
+
+x1=100L
+x2=500L
+x3=900L
+;x2=250L
+;x3=450L
+
+xx1=x1*oversamp+(oversamp/2)
+xx2=x2*oversamp+(oversamp/2)
+xx3=x3*oversamp+(oversamp/2)
+if lin_switch eq 1 then begin
+    lsf1=trial_lsf[*,xx1]
+    lsf2=trial_lsf[*,xx2]
+    lsf3=trial_lsf[*,xx3]
+    
+endif else begin
+    lsf1=trial_lsf
+    lsf2=trial_lsf
+    lsf3=trial_lsf
+endelse
+
+max_lsf=max(lsf1)>max(lsf2)>max(lsf3)
+
+
+
+
+!p.multi=0
+device, /encapsulated, filename =  'lsf_temp.eps'
+!p.font=0
+device, /color, bits=8
+loadct, 12
+
+
+if lin_switch eq 1 then begin
+    plot, dindgen(npix_lsf)/oversamp, lsf1, xtitle='Pixel', title="Line Spread Function", /xs
+    oplot, dindgen(npix_lsf)/oversamp, lsf2, linestyle=2
+    oplot, dindgen(npix_lsf)/oversamp, lsf3, linestyle=4
+    al_legend, ['LSF @ pixel 100', 'LSF @ pixel 500', 'LSF @ pixel 900'], linestyle=[0,2,4]
+endif else begin
+    plot, dindgen(npix_lsf), trial_lsf
+endelse
+device, /close
+
+end

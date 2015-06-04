@@ -1,0 +1,17 @@
+function write_res, wl, res
+
+file='residuals_all.dat'
+
+openw, lun, file, /get_lun
+
+for i=0, n_elements(wl)-1 do begin
+    
+    printf, lun, wl[i], res[i], format='D,D'
+
+endfor
+
+close, lun
+free_lun, lun
+
+end
+

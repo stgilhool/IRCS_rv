@@ -1,0 +1,135 @@
+function ircsrv_convolve, v1, lsf, oversamp=oversamp, first_pix=first_pix, npix_select=npix_select
+;take the LSF array (lsf, pixel) and convolves it with an oversampled
+;spectrum.  Returns the oversampled output, padded with 1's at each
+;end, if necessary (because of edge effects)
+
+;Keywords
+npix=1024L ;CAUTION this needs to be tuned for non-IRCS data sets
+if n_elements(oversamp) eq 0 then oversamp=7L
+if n_elements(first_pix) eq 0 then first_pix=0L
+if n_elements(npix_select) eq 0 then npix_select=npix-first_pix
+
+;Constant defs
+npix_model=npix_select*oversamp
+npix_lsf=oversamp*10L+1L
+
+v1size=size(v1)
+lsfsize=size(lsf)
+;set n_dims
+n_dim_v1=v1size[0]
+n_dim_lsf=lsfsize[0]
+;set dims
+dim_v1=v1size[lindgen(n_dim_v1)+1]
+dim_lsf=lsfsize[lindgen(n_dim_lsf)+1]
+
+;check that lsf is 1d bigger than v1
+if n_dim_lsf ne n_dim_v1+1 then message, "LSF must be 1D bigger than spectrum"
+;check that v1 is at least 1d long
+if n_dim_v1 le 0 then message, "Spectrum not defined"
+;check that v1 is long enough
+if dim_v1[0] lt dim_lsf[1] then print, "WARNING: LSF is longer than spectrum"
+;check that the correct dims match
+;if dim_lsf[2:*] ne dim_v1[1:*] then message, "LSF and spectrum dimensions don't agree"
+
+
+;Initialize some arrays for re-sorting of intensity vector
+npix_spectrum=dim_v1[0]
+npix_lsf=dim_lsf[0]
+npix_model=dim_lsf[1]
+int_conv=dblarr(dim_lsf[1:*])
+int_conv_mtx=dblarr(dim_lsf)
+
+
+;
+npix_pad_start=((npix_lsf/2)-(first_pix*oversamp)) > 0L
+npix_pad_end=((npix_model+(first_pix*oversamp)+(npix_lsf/2))-npix_spectrum) > 0L
+
+first_index_v1=-1*((npix_lsf/2)-(first_pix*oversamp)) > 0L
+last_index_v1=(npix_model+(first_pix*oversamp)-1+(npix_lsf/2)) < (npix_spectrum-1)
+
+npix_v1_new_d1=npix_model+npix_pad_start+npix_pad_end
+v1_length=last_index_v1-first_index_v1+1
+;last_spec_index=(first_pix+npix_select)*oversamp-1
+;last_lsf_index=npix_model-1+(npix_lsf/2)
+;
+;first_pix_over=first_pix*oversamp
+;last_index_over=
+
+
+;account for different possible numbers of dimensions
+case n_dim_lsf of
+
+    2: begin
+        ;make v1 correct length for breaking into array
+        if npix_v1_new_d1 gt npix_spectrum then begin
+            v1_new=replicate(1d0, npix_v1_new_d1)
+            v1_new[npix_pad_start:npix_pad_start+v1_length-1]= $
+              v1[first_index_v1:last_index_v1]
+        endif else v1_new=v1[first_index_v1:last_index_v1]
+        v1=0
+        index=rebin(lindgen(npix_lsf), dim_lsf)
+        index_factor=rebin(reform(lindgen(npix_model), 1, npix_model), dim_lsf)
+        index=index+index_factor
+        
+        int_conv_mtx=v1_new[index]
+        v1_new=0
+        int_conv_mtx=temporary(int_conv_mtx)*lsf
+        int_conv=total(int_conv_mtx, 1, /double)
+    end
+    
+    3: begin
+        ;make v1 correct length for breaking into array
+        v1=rebin(reform(temporary(v1), [dim_v1[0], 1, dim_v1[1:*]]), $
+                 [dim_v1[0], dim_v1])
+
+        if npix_v1_new_d1 gt npix_spectrum then begin
+            v1_new=rebin(replicate(1d0, npix_v1_new_d1), $
+                         [npix_v1_new_d1, dim_v1])
+            
+            v1_new[npix_pad_start:npix_pad_start+v1_length-1, *, *]= $
+              v1[first_index_v1:last_index_v1, *, *]
+        endif else v1_new=v1[first_index_v1:last_index_v1, *, *]
+        v1=0
+        index1=rebin(lindgen(npix_lsf), dim_lsf)
+        index2=rebin(reform(lindgen(npix_model), 1, npix_model), dim_lsf)
+        index1=temporary(index1)+index2
+
+        index3=rebin(reform(lindgen(dim_lsf[-1]), 1, 1, dim_lsf[-1]), dim_lsf)
+              
+        int_conv_mtx=v1_new[index1, index2, index3]
+        v1_new=0
+        int_conv_mtx=temporary(int_conv_mtx)*lsf
+        int_conv=total(int_conv_mtx, 1, /double)
+    end
+    
+    4:  begin
+        ;make v1 correct length for breaking into array
+        v1=temporary(rebin(temporary(reform(temporary(v1), [dim_v1[0], 1, dim_v1[1:*]])), $
+                 [dim_v1[0], dim_v1]))
+
+        
+        if npix_v1_new_d1 gt npix_spectrum then begin
+            v1_new=rebin(replicate(1d0, npix_v1_new_d1), $
+                         [npix_v1_new_d1, dim_v1])
+            v1_new[npix_pad_start:npix_pad_start+v1_length-1, *, *, *]= $
+              v1[first_index_v1:last_index_v1, *, *, *]
+        endif else v1_new=v1[first_index_v1:last_index_v1, *, *, *]
+        v1=0
+        index1=rebin(lindgen(npix_lsf), dim_lsf)
+        index2=rebin(reform(lindgen(npix_model), 1, npix_model), dim_lsf)
+        index1=temporary(index1)+index2
+
+        index3=rebin(reform(lindgen(dim_lsf[-2]), 1, 1, dim_lsf[-2], 1), dim_lsf)
+        index4=rebin(reform(lindgen(dim_lsf[-1]), 1, 1, 1, dim_lsf[-1]), dim_lsf)
+        
+        int_conv_mtx=v1_new[index1, index2, index3, index4]
+        v1_new=0
+        int_conv_mtx=temporary(int_conv_mtx)*lsf
+        int_conv=total(int_conv_mtx, 1, /double)
+    end
+
+endcase
+
+return, int_conv
+
+end
