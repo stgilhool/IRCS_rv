@@ -278,7 +278,7 @@ if n_elements(visualize) eq 0 then visualize=1
 ;Define keywords for fitting just a range
 if n_elements(first_pix) eq 0 then first_pix=0
 if n_elements(npix_select) eq 0 then npix_select=128L;npix_select=npix-first_pix
-if n_elements(mode) eq 0 then mode='mpfit'
+if n_elements(mode) eq 0 then mode='ga'
 
 
 ;set file paths
@@ -455,7 +455,7 @@ npixselect=npix_select
 firstpix=first_pix
 fmode=mode
 
-;Assume lin_switch is on
+;Assume lin_switch is off
 lin_switch=0
 
 ;;;Parameters from earlier calibration
@@ -623,8 +623,8 @@ if visualize eq 1 then window, 0, xsize=1500, ysize=1000
 !p.multi=[0,1,5]
 
 
-;for visit=0, n_ABobj-1 do begin
-for visit=0,0 do begin
+for visit=0, n_ABobj-1 do begin
+;for visit=0,0 do begin
 ;for i=0,1 do begin
 ;    vlist=[7,11]
 ;    visit=vlist[i]
@@ -680,15 +680,10 @@ for visit=0,0 do begin
     h2o_depth_guess=[1d0]
     co2ch4_depth_guess=[1d0]
     delta_wl_guess=[1d-6]
-;delta_wl_guess=[0d0]
-    ;gh0_guess=[0.73206094d0, -0.22073388d0]
-    ;gh1_guess=[-0.00034400810d0, 0.00065816410]
-    gh0_guess=replicate(1d-1, n_bases_lsf);dblarr(n_bases_lsf)
-    ;gh1_guess=replicate(1d-1, n_bases_lsf);dblarr(n_bases_lsf)
+
+    gh0_guess=replicate(1d-1, n_bases_lsf)
     gh0_scale=dblarr(n_bases_lsf)
-    ;gh1_scale=dblarr(n_bases_lsf)
-    ;gh0_guess=[0.73206094d0, -0.22073388d0,0d0,0d0]
-    ;gh1_guess=[-0.00034400810d0, 0.00065816410d0, 0d0,0d0]
+
     other_guess=replicate(1d0, n_other)
     other_scale=dblarr(n_other)
 
@@ -697,32 +692,19 @@ for visit=0,0 do begin
     h2o_depth_scale=[0.5d0]
     co2ch4_depth_scale=[0.5d0]
     delta_wl_scale=[5d-6]
-    ;delta_wl_scale=[1d-8]
-    ;gh0_scale=[1d0, 1d-1]
-    ;gh1_scale=[1d-3, 1d-5]
-    ;gh0_scale=[1d0, 1d-1,1d-1,1d-1]
-    ;gh1_scale=[1d-3, 1d-5,1d-1,1d-1]
-    
-    
-    
-    
+
+    ;indices
     delta_rv_index=0
     h2o_depth_index=1
     co2ch4_depth_index=2
     delta_wl_index=lindgen(n_elements(delta_wl_guess))+co2ch4_depth_index+1
     gh0_coeff_index=lindgen(n_elements(gh0_guess))+delta_wl_index[-1]+1
     gh1_coeff_index=!values.d_nan
-    ;gh1_coeff_index=lindgen(n_elements(gh1_guess))+gh0_coeff_index[-1]+1
     other_index=lindgen(n_elements(other_guess))+gh0_coeff_index[-1]+1
     nh3_depth_index=other_index[0]
+
     if n_elements(other_index) gt 1 then $
       norm_index=other_index[1:*]
-;stop
-;delta_wl_index=3
-;gh0_coeff_index=[4,5,6,7,8,9,10]
-;gh1_coeff_index=[11,12,13,14,15,16,17]
-;other_index=[18,19,20,21,22,23,24,25,26,27,28,29,30]
-    
     nparam_total=other_index[-1]+1
     
 
@@ -733,16 +715,9 @@ for visit=0,0 do begin
         
         h2o_depth_guess=str.result[str.h2o_depth_index]
         co2ch4_depth_guess=str.result[str.co2ch4_depth_index]
-        ;delta_wl_guess=str.result[str.delta_wl_index]
-        
-        ;gh0_guess[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]=str.result[str.gh0_coeff_index[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]]
-        ;gh1_guess[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]=str.result[str.gh1_coeff_index[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]]
         
         other_guess_all=str.result[str.other_index]
         other_guess=other_guess_all[0:n_other-1]
-        
-        
-        ;if rv_guess eq 0 then rv_guess=1d-3
     endif else begin
         print, "File doesn't exist"
         openw, lun, '/home/stgilhool/RV_projects/IRCS_rv/data/rvshift1_results/errors.dat', /append, /get_lun
@@ -751,37 +726,16 @@ for visit=0,0 do begin
         free_lun, lun
 
         rv_guess=[-1d0*delta_bcv]
-        ;gh0_guess_all=[0.5d0, -0.1d0,1d-3,1d-3]
-        ;gh1_guess_all=[2d-4, 1d-4, 1d-6,1d-6]
         other_guess_all=replicate(1d0, 13)
-
-        ;gh0_guess=gh0_guess_all[0:n_bases_lsf-1]
-        ;gh1_guess=gh0_guess_all[0:n_bases_lsf-1]
         other_guess=other_guess_all[0:n_other-1]
     endelse
         
 
 ;;; SCALE THE PARAMETERS TO BE OF SAMEISH ORDER
-    ;delta_wl_parscale=[1d6, 1d7]
     rv_read=0 ;make rv starting guesses -1*d_bcv    
-    ;wl_start_list=[2.5d-14, 5d-14, 7.5d-14, 1d-13, 2.5d-13, 5d-13, 7.5d-13, 1d-12, 2.5d-12, 5d-12, 7.5d-12, 1d-11]
-    ;par0_start_list=[0.45d0, 0.5d0, 0.55d0, 0.6d0, 0.65d0, 0.7d0, 0.75d0, 0.8d0, 0.85d0, 0.9d0, 0.95d0, 1d0]
-    
-    ;wl_start_list=[-1d-6, -1d-7, -1d-8, -1d-9, -1d-10, -1d-11, -1d-12, -1d-13, -1d-14, -1d-15, 1d-15, 1d-14, 1d-13, 1d-12, 1d-11, 1d-10, 1d-9, 1d-8, 1d-7, 1d-6]
-    ;wl_list_neg=-10^(-1d0*(dindgen(40)/10d0)-4d0)
-    ;wl_list_pos=10^((dindgen(40)/10d0)-8d0)
-    ;wl_list_neg=-10^(-1d0*(dindgen(13)/2d0)-5d0)
-    ;wl_list_pos=10^((dindgen(13)/2d0)-9d0)
-    ;wl_start_list=[[wl_list_neg],[wl_list_pos]]
-    ;wl_start_list=[-1d-6, 1d-6]
-    
-    ;wl_start_list=(dindgen(201)-100d0)*1d-7
-    ;wl_start_list=(dindgen(101)-50d0)*1d-7
     old_way=0
     if old_way eq 1 then begin
         par0_start_list=[0.65d0,0d0,0d0]
-        ;rv_start_list=(dindgen(41)-20)*0.030d0
-        ;rv_start_list=(dindgen(41)-33)*0.030d0
         
         rvstep=0.05d0 ;50 m/s
         wlstep=5d-7   ;should be roughly equal to 50 m/s
