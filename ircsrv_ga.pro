@@ -1,4 +1,9 @@
-function ga_model
+function ga_model, p, np, funa=funa
+
+chi2_vec=dblarr(np)
+for model_num=0, np-1 do begin
+    chi2[model_num]=rvmodel(p[*,model_num])
+endfor
 
 function rvmodel, p, fakekey=fakekey
 
@@ -721,18 +726,7 @@ for visit=0, n_ABobj-1 do begin
         
 
                                 ;; SCALE THE PARAMETERS TO BE OF SAMEISH ORDER
-    rv_read=0 ;make rv starting guesses -1*d_bcv    
-
-    
-    rvstep=0.05d0 ;50 m/s
-    wlstep=5d-7   ;should be roughly equal to 50 m/s
-    
-    
-    rvbound=[-0.300,0.300]
-    wlbound=[-1d-5,1d-5]
-    
-    
-    
+       
     
     ;Readin best wl and sig from before
     readcol, 'startingparams.txt', wl_best_list, sig_best_start, chbest, rv_best_list, format='(D,D,D,D)'
@@ -742,8 +736,7 @@ for visit=0, n_ABobj-1 do begin
 
     
             
-            ;delta_wl_guess=delta_wl_guess*delta_wl_parscale
-            
+                       
             ;Define mpfit constraints
             parinfo = replicate({parname:'null' , value:0d0 , step:0d0 , relstep:0d0 ,fixed:0, limited:[0,0], $
                                  limits:[0.D,0.D], mpside:0}, nparam_total)
@@ -1080,6 +1073,19 @@ for visit=0, n_ABobj-1 do begin
     if fmode ne 'one_call' then mwrfits, output_str, output_file
 
 endfor
+
+for visit=0, n_ABobj-1 do begin
+    ;;READ IN MPFIT RUN RESULTS
+    input_str=mrdfits(output_file, visit+1)
+    guess=input_str.result
+    n_lsf_ga=2 ;MAKE KEYWORD
+    gh0_coeff_index=lindgen(n_lsf_ga)+input_str.gh0_coeff_index[0]
+    help, gh0_coeff_index
+    stop
+    other_index=lindgen(n_other)+ gh0_coeff_index[-1]+1
+
+    ;;SCALE SO THAT THE PARAMETERS ARE 0.5 with limits at 0 and 1
+    
 
 
 
