@@ -1,3 +1,5 @@
+function ga_model
+
 function rvmodel, p, fakekey=fakekey
 
 common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npix, int_lab, wl_lab, template, wl_template, oversamp, npix_select, first_pix, observation, err, mode, visit, last_guess, visualize,wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index
@@ -739,15 +741,6 @@ for visit=0, n_ABobj-1 do begin
         
 
     
-    ;MESS WITH NORMALIZATION
-    other_guess=other_guess[0:n_other-1]
-    other_scale=other_scale[0:n_other-1]
-    
-    guess=[rv_guess, h2o_depth_guess, co2ch4_depth_guess, delta_wl_guess, gh0_guess, other_guess]
-            scale=[rv_scale, h2o_depth_scale, co2ch4_depth_scale, delta_wl_scale, gh0_scale, other_scale]
-            
-            guess=guess*parscale_all
-            scale=scale*parscale_all
             
             ;delta_wl_guess=delta_wl_guess*delta_wl_parscale
             
@@ -887,6 +880,11 @@ for visit=0, n_ABobj-1 do begin
             parscale_all[gh0_coeff_index] = gh0_coeff_parscale
             parscale_all[other_index] = other_parscale
             
+    
+            guess=parinfo.value
+            scale=[rv_scale, h2o_depth_scale, co2ch4_depth_scale, delta_wl_scale, gh0_scale, other_scale]
+            
+            ;scale=scale*parscale_all
         
             
   ;;;  ----  Check Starting Values
@@ -957,8 +955,6 @@ for visit=0, n_ABobj-1 do begin
                           function_value=fval, nmax=150000L)
                 chi2=fval[0]
             endif else if fmode eq 'mpfit' then begin
-                ;r=mpfit('rvmodel', guess, bestnorm=chi2, ftol=ftol,
-                ;parinfo=parinfo, status=status, /quiet)
                 r=mpfit('rvmodel', bestnorm=chi2, ftol=ftol, parinfo=parinfo, status=status, /quiet)
                 fmode='one_call'
                 ;print, "R before onecall: ", r
@@ -1065,10 +1061,10 @@ for visit=0, n_ABobj-1 do begin
                         OBS_SELECT:obs_select, $
                         ERR_SELECT:err_select, $
                         LSF:lsf, $
-                        WL_START:wl_start_list, $
-                        WL_RESULT:r[delta_wl_index], $
-                        SIG_START:sig_start, $
-                        SIG_RESULT:r[gh0_coeff_index[0]], $
+                        ;WL_START:wl_start, $
+                        ;WL_RESULT:r[delta_wl_index], $
+                        ;SIG_START:sig_start, $
+                        ;SIG_RESULT:r[gh0_coeff_index[0]], $
                         MJD:mjd, $
                         BCV:bcv, $
                         DELTA_BCV:delta_bcv, $
@@ -1084,6 +1080,9 @@ for visit=0, n_ABobj-1 do begin
     if fmode ne 'one_call' then mwrfits, output_str, output_file
 
 endfor
+
+
+
         
 !p.multi=0
 
