@@ -8,16 +8,16 @@ if n_elements(visualize) eq 0 then visualize=1
 if n_elements(smooth_first) eq 0 then smooth_first = 0
 
 
-n_bases_lsf1=2L
+n_bases_lsf1=1L
   first_pix=310L
   npix_select=89L
   n_other1=2L ;1 norm parameter
-    mode_1='mpfit'
+    mode_1='ga'
     run1=1L
 
 
 
-current_tag1='ga_test1'
+current_tag1='Jun09_gatest1'
 ;First test with genetic algorithm iterative optimization (mpfit w/
 ;gaussian, then solber genetic algorithm)
 
