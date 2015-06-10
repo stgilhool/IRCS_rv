@@ -2,6 +2,11 @@
 ; SOLution BreedER
 ; ///////////////
 
+;EDITED BY STEVE GILHOOL
+;Corrected sorting mistake at end of generation
+;Changed save function to save only unique solutions
+;Made all parameter values double precision
+
 ; USE
 ; solution = SOLBER('myfitfun', ndim, funa = funa)
 ; 
@@ -54,9 +59,9 @@ FUNCTION SolBer, fitfun, ndim, funa = funa, lim = lim, npop = npop, crossrate = 
 
 ; Parameter limits
 IF NOT(keyword_set(lim)) THEN BEGIN 
-  lim = fltarr(2, ndim)
-  lim[0, *]= replicate(0., ndim)
-  lim[1, *] = replicate(1., ndim)
+  lim = dblarr(2, ndim)
+  lim[0, *]= replicate(0.0d0, ndim)
+  lim[1, *] = replicate(1.0d0, ndim)
 ENDIF 
 ; Population size
 IF NOT(keyword_set(npop)) THEN npop = 300
@@ -120,7 +125,7 @@ IF plot_flag EQ 1 THEN BEGIN
 ENDIF 
 
 ; First generation
-gen = randomu(seed, ndim, npop)
+gen = randomu(seed, ndim, npop, /double)
 
 ; Evaluate generation fitness
 dum = p0+dp*gen
@@ -129,6 +134,8 @@ gfit = call_function(fitfun, dum, npop, funa = funa)
 ; Save
 IF keyword_set(save_gen) THEN save_gen = reform(p0+dp*gen, ndim, npop)
 IF keyword_set(save_gfit) THEN save_gfit = gfit
+
+
 
 ; Initialize histories
 hist_fit0 = [min(gfit)]
@@ -171,7 +178,7 @@ REPEAT BEGIN
   par1 = (ind[sel])[_rand_perm(nsel, npop)]
   par2 = (ind[sel])[_rand_perm(nsel, npop)]
 ; Crossover
-  cross = randomu(seed, ndim, npop)
+  cross = randomu(seed, ndim, npop, /double)
   wcross = where(cross LT crossrate, complement = wncross, ncomplement = nwncross)
   IF nwncross GT 0 THEN cross[wncross] = 1
   ch1 = cross*gen[*, par1]+(1-cross)*gen[*, par2]
@@ -179,10 +186,10 @@ REPEAT BEGIN
   
 ; Mutate
   mutest1 = randomu(seed, ndim, npop)
-  mut1 = randomu(seed, ndim, npop)
+  mut1 = randomu(seed, ndim, npop, /double)
   wmut1 = where(mutest1 LT mutrate, nmut1)
   mutest2 = randomu(seed, ndim, npop)
-  mut2 = randomu(seed, ndim, npop)
+  mut2 = randomu(seed, ndim, npop, /double)
   wmut2 = where(mutest2 LT mutrate, nmut2)
   IF nmut1 GT 0 THEN ch1[wmut1] = mut1[wmut1]
   IF nmut2 GT 0 THEN ch2[wmut2] = mut2[wmut2]
@@ -233,7 +240,7 @@ REPEAT BEGIN
       inbred = total(hist_dfit[igen-ngen_inbred-1:igen-1] GT dfit_inbred)
       IF inbred EQ 0 THEN BEGIN 
         mutest = randomu(seed, ndim, npop)
-        mut = randomu(seed, ndim, npop)
+        mut = randomu(seed, ndim, npop, /double)
         wmut = where(mutest LT mutrate, nmut)
         IF nmut GT 0 THEN BEGIN 
           gen[wmut] = mut[wmut]
@@ -243,6 +250,14 @@ REPEAT BEGIN
         ENDIF 
       enDIF 
     ENDIF 
+
+    ; Re-sort the solutions, since children might outrank their
+    ; parents' betters, and also because Mutate-all could change the
+    ; ranking
+    
+    newrank=sort(gfit)
+    gfit=gfit(newrank)
+    gen=gen[*,newrank]
 
 ; Keep best
     gen[*, 0] = gbest
@@ -257,7 +272,84 @@ REPEAT BEGIN
 
 ; Save
   IF keyword_set(save_gen) THEN save_gen = [[save_gen], [reform(p0+dp*gen, ndim, npop)]]
+
   IF keyword_set(save_gfit) THEN save_gfit = [save_gfit, gfit]
+
+; New save function (save unique solutions within 10 percent of best solution)
+  IF (keyword_set(new_save_gen) OR keyword_set(new_save_gfit) $
+      OR keyword_set(new_save_igen)) THEN BEGIN
+      ;nsaves=n_elements(new_save_gen)
+      gdiff=(gfit-bestfit)/bestfit
+      potentials=where(gdiff LT 0.1, npotentials)
+      IF igen EQ 0 THEN BEGIN
+          new_save_gen=gbest
+          new_save_gfit=bestfit
+          new_save_igen=0
+          FOR ipot = 1, npotentials-1 DO BEGIN
+              ;Check to see if unique by checking first parameter
+              ;If any parameter matches, then check entire solution
+              sol_match=0
+              par0_match_row=where((p0[0,0]+dp[0,0]*gen[0,potentials[ipot]]) EQ new_save_gen[0,*], n_match)
+              IF n_match GT 0 THEN BEGIN
+                  
+                  FOREACH row_num, par0_match_row DO BEGIN
+                      ;Check equality of entire solution
+                      IF total((p0[*,0]+dp[*,0]*gen[*,potentials[ipot]]) NE new_save_gen[*,row_num]) EQ 0 THEN BEGIN
+                          sol_match=1
+                          break
+                      ENDIF
+                  ENDFOREACH
+              ENDIF
+              ;;;HERE
+          ENDFOR
+          new_save_gen = dblarr(ndim)
+          new_save_gfit= 0d0
+          new_save_igen= 0
+      ENDIF
+      
+      IF npotentials GT 0 THEN BEGIN
+          keep_flag=replicate(1, npotentials)
+          FOR ipot = 0, npotentials-1 DO BEGIN
+              ;Check to see if unique by checking first parameter
+              ;If any parameter matches, then check entire solution
+              sol_match=0
+              par0_match_row=where((p0[0,0]+dp[0,0]*gen[0,potentials[ipot]]) EQ new_save_gen[0,*], n_match)
+              IF n_match GT 0 THEN BEGIN
+                  
+                  FOREACH row_num, par0_match_row DO BEGIN
+                      ;Check equality of entire solution
+                      IF total((p0[*,0]+dp[*,0]*gen[*,potentials[ipot]]) NE new_save_gen[*,row_num]) eq 0 THEN BEGIN
+                          sol_match = 1
+                          keep_flag[ipot]=0
+                          break
+                      ENDIF
+                  ENDFOREACH
+              ENDIF
+          ENDFOR
+          keep_ind=where(keep_flag EQ 1, nkeep)
+          IF nkeep GT 0 THEN BEGIN
+              keepers=potentials[keep_ind]
+              this_save_gen=  rebin(p0[*,0], ndim, nkeep) + $
+                (rebin(dp[*,0], ndim, nkeep) * gen[*,keepers])
+              new_save_gen = [[new_save_gen], [this_save_gen]]
+              
+              
+              new_save_gfit = [new_save_gfit, gfit[keepers]]
+              
+              new_save_igen = [new_save_igen, replicate(igen, nkeep)]
+              
+              ;SORT BY FITNESS
+              save_rank=sort(new_save_gfit)
+              new_save_gen=new_save_gen[*,save_rank]
+              new_save_gfit=new_save_gfit[save_rank]
+              new_save_igen=new_save_igen[save_rank]
+              
+          ENDIF
+      ENDIF
+  ENDIF
+  
+
+
 
 ; PLOT
   IF plot_flag EQ 1 THEN BEGIN 
