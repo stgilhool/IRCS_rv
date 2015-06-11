@@ -1233,7 +1233,7 @@ other_index=otherga_index
             new_save_gfit=0d0
             new_save_igen=0
 
-            sol=solber('ga_model',ndim, npop=1000L, funa=funa, lim=lim, ngen_max=50L, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=new_save_gen, new_save_gfit=new_save_gfit, new_save_igen=new_save_igen)
+            sol=solber('ga_model',ndim, npop=500L, funa=funa, lim=lim, ngen_max=20L, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=new_save_gen, new_save_gfit=new_save_gfit, new_save_igen=new_save_igen)
             
             help, sol
             print, sol

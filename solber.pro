@@ -276,8 +276,8 @@ REPEAT BEGIN
   IF keyword_set(save_gfit) THEN save_gfit = [save_gfit, gfit]
 
 ; New save function (save unique solutions within 10 percent of best solution)
-  IF (keyword_set(new_save_gen) OR keyword_set(new_save_gfit) $
-      OR keyword_set(new_save_igen)) THEN BEGIN
+  IF (n_elements(new_save_gen) ne 0 OR n_elements(new_save_gfit) ne 0 $
+      OR n_elements(new_save_igen) ne 0) THEN BEGIN
       ;nsaves=n_elements(new_save_gen)
       gdiff=(gfit-bestfit)/bestfit
       potentials=where(gdiff LT 0.1, npotentials)
@@ -304,7 +304,7 @@ REPEAT BEGIN
               IF sol_match EQ 0 THEN BEGIN
                  new_save_gen=[[new_save_gen], [(p0[*,0]+dp[*,0]*gen[*,potentials[ipot]])]]    
                  new_save_gfit=[new_save_gfit, gfit[potentials[ipot]]]
-                 new_save_igen=[new_save_igen, 0]
+               print,   new_save_igen=[new_save_igen, 0]
               ENDIF
           ENDFOR
           new_save_gen = dblarr(ndim)
