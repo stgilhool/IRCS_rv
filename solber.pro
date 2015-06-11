@@ -51,7 +51,7 @@ FUNCTION _Rand_Perm, numberOfElements, numberInPermutation
 END
 
 ; MAIN
-FUNCTION SolBer, fitfun, ndim, funa = funa, lim = lim, npop = npop, crossrate = crossrate, mutrate = mutrate, ngen_max = ngen_max, term_fit = term_fit, term_flag = term_flag, nrep_frac = nrep_frac, ngen_inbred = ngen_inbred, dfit_inbred = dfit_inbred, mrate_min = mrate_min, mrate_max = mrate_max, difgfit_min = difgfit_min, delta = delta, plot_flag = plot_flag, print_flag = print_flag, gfit_best = gfit_best, status = status, ngen_tot = ngen_tot, save_gen = save_gen, save_gfit = save_gfit
+FUNCTION SolBer, fitfun, ndim, funa = funa, lim = lim, npop = npop, crossrate = crossrate, mutrate = mutrate, ngen_max = ngen_max, term_fit = term_fit, term_flag = term_flag, nrep_frac = nrep_frac, ngen_inbred = ngen_inbred, dfit_inbred = dfit_inbred, mrate_min = mrate_min, mrate_max = mrate_max, difgfit_min = difgfit_min, delta = delta, plot_flag = plot_flag, print_flag = print_flag, gfit_best = gfit_best, status = status, ngen_tot = ngen_tot, save_gen = save_gen, save_gfit = save_gfit, new_save_gen = new_save_gen, new_save_gfit = new_save_gfit, new_save_igen = new_save_igen
 
 ; LEVEL 1 keywords
 ; ----------------
@@ -302,7 +302,7 @@ REPEAT BEGIN
               ENDIF
               
               IF sol_match EQ 0 THEN BEGIN
-                 new_save_gen=[[new_save_gen], [p0[*,0]+dp[*,0]*gen[*,potentials[ipot]]]    
+                 new_save_gen=[[new_save_gen], [(p0[*,0]+dp[*,0]*gen[*,potentials[ipot]])]]    
                  new_save_gfit=[new_save_gfit, gfit[potentials[ipot]]]
                  new_save_igen=[new_save_igen, 0]
               ENDIF
