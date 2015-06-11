@@ -285,32 +285,31 @@ REPEAT BEGIN
           new_save_gen=gbest
           new_save_gfit=bestfit
           new_save_igen=0
-          FOR ipot = 1, npotentials-1 DO BEGIN
-              ;Check to see if unique by checking first parameter
-              ;If any parameter matches, then check entire solution
-              sol_match=0
-              par0_match_row=where((p0[0,0]+dp[0,0]*gen[0,potentials[ipot]]) EQ new_save_gen[0,*], n_match)
-              IF n_match GT 0 THEN BEGIN
+          IF npotentials GT 1 THEN BEGIN
+              FOR ipot = 1, npotentials-1 DO BEGIN
+                  ;Check to see if unique by checking first parameter
+                  ;If any parameter matches, then check entire solution
+                  sol_match=0
+                  par0_match_row=where((p0[0,0]+dp[0,0]*gen[0,potentials[ipot]]) EQ new_save_gen[0,*], n_match)
+                  IF n_match GT 0 THEN BEGIN
+                      
+                      FOREACH row_num, par0_match_row DO BEGIN
+                          ;Check equality of entire solution
+                          IF total((p0[*,0]+dp[*,0]*gen[*,potentials[ipot]]) NE new_save_gen[*,row_num]) EQ 0 THEN BEGIN
+                              sol_match=1
+                              break
+                          ENDIF
+                      ENDFOREACH
+                  ENDIF
                   
-                  FOREACH row_num, par0_match_row DO BEGIN
-                      ;Check equality of entire solution
-                      IF total((p0[*,0]+dp[*,0]*gen[*,potentials[ipot]]) NE new_save_gen[*,row_num]) EQ 0 THEN BEGIN
-                          sol_match=1
-                          break
-                      ENDIF
-                  ENDFOREACH
-              ENDIF
-              
-              IF sol_match EQ 0 THEN BEGIN
-                 new_save_gen=[[new_save_gen], [(p0[*,0]+dp[*,0]*gen[*,potentials[ipot]])]]    
-                 new_save_gfit=[new_save_gfit, gfit[potentials[ipot]]]
-               print,   new_save_igen=[new_save_igen, 0]
-              ENDIF
-          ENDFOR
-          new_save_gen = dblarr(ndim)
-          new_save_gfit= 0d0
-          new_save_igen= 0
-       ENDIF ELSE IF npotentials GT 0 THEN BEGIN
+                  IF sol_match EQ 0 THEN BEGIN
+                      new_save_gen=[[new_save_gen], [(p0[*,0]+dp[*,0]*gen[*,potentials[ipot]])]]    
+                      new_save_gfit=[new_save_gfit, gfit[potentials[ipot]]]
+                      print,   new_save_igen=[new_save_igen, 0]
+                  ENDIF
+              ENDFOR
+          ENDIF
+      ENDIF ELSE IF npotentials GT 0 THEN BEGIN
           keep_flag=replicate(1, npotentials)
           FOR ipot = 0, npotentials-1 DO BEGIN
               ;Check to see if unique by checking first parameter

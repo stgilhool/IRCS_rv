@@ -179,7 +179,7 @@ chi2_nopen=total(chi1_vec_nopen^2, /double, /nan)
 
 
 
-if (visualize eq 1 or mode eq 'one_call') then begin
+if (visualize eq 1 ) then begin ;or mode eq 'one_call') then begin
 
     ;Set up big dots
     phi=findgen(32)*(!PI*2/32.)
@@ -1115,7 +1115,7 @@ for visit=0, n_ABobj-1 do begin
     input_str=mrdfits(output_file, visit+1)
     guess=input_str.result
     
-    n_lsf_ga=3 ;MAKE KEYWORD
+    n_lsf_ga=4 ;MAKE KEYWORD
     gh0_coeff_index=input_str.gh0_coeff_index
     n_lsf_diff=n_lsf_ga-n_elements(gh0_coeff_index)
     n_other=n_elements(input_str.other_index)
@@ -1229,11 +1229,11 @@ other_index=otherga_index
             fitness=0d0
 
             funa={param_m:param_m, param_b:param_b}
-            new_save_gfit=dblarr(ndim)
-            new_save_gfit=0d0
-            new_save_igen=0
+            save_gfit=dblarr(ndim)
+            save_gfit=0d0
+            save_igen=0
 
-            sol=solber('ga_model',ndim, npop=500L, funa=funa, lim=lim, ngen_max=20L, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=new_save_gen, new_save_gfit=new_save_gfit, new_save_igen=new_save_igen)
+            sol=solber('ga_model',ndim, npop=100L, funa=funa, lim=lim, ngen_max=500L, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen)
             
             help, sol
             print, sol
@@ -1254,7 +1254,24 @@ other_index=otherga_index
                         chi2:chi2 $
                         }
 
-            
+            n_top=15L
+            help, save_gen
+            print, reform(save_gen[0,0:n_top-1], n_top)
+            help, save_gfit
+            print, save_gfit[0:n_top-1]
+            help, save_igen
+            print, save_igen[0:n_top-1]
+
+            fmode='one_call'
+            octest=rvmodel(real_param)
+            device, decomposed=1
+            window, 1, xs=700, ys=500
+            plot, octest.lsf[*,0], /xs
+            window, 2, xs=700, ys=500
+            plot, octest.residuals, ps=3, /xs
+            window, 3, xs=700, ys=500
+            plot, octest.obs, ps=6, /xs
+            oplot, octest.model, ps=6, color=200
             stop
             
             ;if file_test(output_file) then begin
