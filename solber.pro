@@ -300,14 +300,17 @@ REPEAT BEGIN
                       ENDIF
                   ENDFOREACH
               ENDIF
-              ;;;HERE
+              
+              IF sol_match EQ 0 THEN BEGIN
+                 new_save_gen=[[new_save_gen], [p0[*,0]+dp[*,0]*gen[*,potentials[ipot]]]    
+                 new_save_gfit=[new_save_gfit, gfit[potentials[ipot]]]
+                 new_save_igen=[new_save_igen, 0]
+              ENDIF
           ENDFOR
           new_save_gen = dblarr(ndim)
           new_save_gfit= 0d0
           new_save_igen= 0
-      ENDIF
-      
-      IF npotentials GT 0 THEN BEGIN
+       ENDIF ELSE IF npotentials GT 0 THEN BEGIN
           keep_flag=replicate(1, npotentials)
           FOR ipot = 0, npotentials-1 DO BEGIN
               ;Check to see if unique by checking first parameter
