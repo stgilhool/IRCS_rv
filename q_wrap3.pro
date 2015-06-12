@@ -12,17 +12,69 @@ n_bases_lsf1=1L
   first_pix=310L
   npix_select=89L
   n_other1=2L ;1 norm parameter
-    mode_1='ga'
+    mode_1='mpfit'
     run1=1L
+n_lsf_ga=2L
+
+npop=10L
+ngen_max=10L
+ex={npop:npop, $
+    ngen_max:ngen_max $
+   }
+
+current_tag1='Jun12_ga2_'+strtrim(npop,2)+'_'+strtrim(ngen_max,2)
+;Testing optimal npop and ngen on exposure 0 only
+
+;ircsrv_ga, first_pix=first_pix, npix_select=npix_select, visualize=0, run=0, current_tag=current_tag1, n_bases_lsf=n_bases_lsf1, n_lsf_ga=n_lsf_ga, mode=mode_1, n_other=n_other1, _extra=ex
+
+n_lsf_ga=2L
+npop=100L
+ngen_max=10L
+ex={npop:npop, $
+    ngen_max:ngen_max $
+   }
+
+current_tag1='Jun12_ga2_'+strtrim(npop,2)+'_'+strtrim(ngen_max,2)
+;Testing optimal npop and ngen on exposure 0 only
+
+;ircsrv_ga, first_pix=first_pix, npix_select=npix_select, visualize=0, run=0, current_tag=current_tag1, n_bases_lsf=n_bases_lsf1, n_lsf_ga=n_lsf_ga, mode=mode_1, n_other=n_other1, _extra=ex
 
 
+n_lsf_ga=2L
+npop=1000L
+ngen_max=10L
+ex={npop:npop, $
+    ngen_max:ngen_max $
+   }
 
-current_tag1='Jun09_gatest1'
-;First test with genetic algorithm iterative optimization (mpfit w/
-;gaussian, then solber genetic algorithm)
+current_tag1='Jun12_ga2_'+strtrim(npop,2)+'_'+strtrim(ngen_max,2)
+;Testing optimal npop and ngen on exposure 0 only
+
+;ircsrv_ga, first_pix=first_pix, npix_select=npix_select, visualize=0, run=0, current_tag=current_tag1, n_bases_lsf=n_bases_lsf1, n_lsf_ga=n_lsf_ga, mode=mode_1, n_other=n_other1, _extra=ex
+
+n_lsf_ga=2L
+npop=10L
+ngen_max=1000L
+ex={npop:npop, $
+    ngen_max:ngen_max $
+   }
+
+current_tag1='Jun12_ga2_'+strtrim(npop,2)+'_'+strtrim(ngen_max,2)
+;Testing optimal npop and ngen on exposure 0 only
+
+;ircsrv_ga, first_pix=first_pix, npix_select=npix_select, visualize=0, run=0, current_tag=current_tag1, n_bases_lsf=n_bases_lsf1, n_lsf_ga=n_lsf_ga, mode=mode_1, n_other=n_other1, _extra=ex
 
 
-ircsrv_ga, first_pix=first_pix, npix_select=npix_select, visualize=0, run=0, current_tag=current_tag1, n_bases_lsf=n_bases_lsf1, mode=mode_1, n_other=n_other1
+n_lsf_ga=2L
+npop=1000L
+ngen_max=1000L
+ex={npop:npop, $
+    ngen_max:ngen_max $
+   }
 
+current_tag1='Jun12_ga2_'+strtrim(npop,2)+'_'+strtrim(ngen_max,2)
+;Testing optimal npop and ngen on exposure 0 only
+
+ircsrv_ga, first_pix=first_pix, npix_select=npix_select, visualize=0, run=0, current_tag=current_tag1, n_bases_lsf=n_bases_lsf1, n_lsf_ga=n_lsf_ga, mode=mode_1, n_other=n_other1, _extra=ex
 
 end

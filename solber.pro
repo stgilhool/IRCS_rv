@@ -51,7 +51,7 @@ FUNCTION _Rand_Perm, numberOfElements, numberInPermutation
 END
 
 ; MAIN
-FUNCTION SolBer, fitfun, ndim, funa = funa, lim = lim, npop = npop, crossrate = crossrate, mutrate = mutrate, ngen_max = ngen_max, term_fit = term_fit, term_flag = term_flag, nrep_frac = nrep_frac, ngen_inbred = ngen_inbred, dfit_inbred = dfit_inbred, mrate_min = mrate_min, mrate_max = mrate_max, difgfit_min = difgfit_min, delta = delta, plot_flag = plot_flag, print_flag = print_flag, gfit_best = gfit_best, status = status, ngen_tot = ngen_tot, save_gen = save_gen, save_gfit = save_gfit, new_save_gen = new_save_gen, new_save_gfit = new_save_gfit, new_save_igen = new_save_igen
+FUNCTION SolBer, fitfun, ndim, funa = funa, lim = lim, npop = npop, crossrate = crossrate, mutrate = mutrate, ngen_max = ngen_max, term_fit = term_fit, term_flag = term_flag, nrep_frac = nrep_frac, ngen_inbred = ngen_inbred, dfit_inbred = dfit_inbred, mrate_min = mrate_min, mrate_max = mrate_max, difgfit_min = difgfit_min, delta = delta, plot_flag = plot_flag, print_flag = print_flag, gfit_best = gfit_best, status = status, ngen_tot = ngen_tot, save_gen = save_gen, save_gfit = save_gfit, new_save_gen = new_save_gen, new_save_gfit = new_save_gfit, new_save_igen = new_save_igen, new_save_gbest=new_save_gbest, new_save_time=new_save_time
 
 ; LEVEL 1 keywords
 ; ----------------
@@ -126,6 +126,9 @@ ENDIF
 
 ; First generation
 gen = randomu(seed, ndim, npop, /double)
+
+;START TIMER
+clock=tic()
 
 ; Evaluate generation fitness
 dum = p0+dp*gen
@@ -285,6 +288,8 @@ REPEAT BEGIN
           new_save_gen=gbest
           new_save_gfit=bestfit
           new_save_igen=0
+          new_save_gbest=[gbest, bestfit]
+	  new_save_time=toc(clock)
           IF npotentials GT 1 THEN BEGIN
               FOR ipot = 1, npotentials-1 DO BEGIN
                   ;Check to see if unique by checking first parameter
@@ -305,7 +310,7 @@ REPEAT BEGIN
                   IF sol_match EQ 0 THEN BEGIN
                       new_save_gen=[[new_save_gen], [(p0[*,0]+dp[*,0]*gen[*,potentials[ipot]])]]    
                       new_save_gfit=[new_save_gfit, gfit[potentials[ipot]]]
-                      print,   new_save_igen=[new_save_igen, 0]
+                      new_save_igen=[new_save_igen, 0]
                   ENDIF
               ENDFOR
           ENDIF
@@ -339,7 +344,9 @@ REPEAT BEGIN
               new_save_gfit = [new_save_gfit, gfit[keepers]]
               
               new_save_igen = [new_save_igen, replicate(igen, nkeep)]
-              
+              new_save_gbest = [[new_save_gbest], [this_save_gen[*,0],gfit[keepers[0]]]]
+	this_time=toc(clock)      
+	new_save_time = [new_save_time, this_time] 
               ;SORT BY FITNESS
               save_rank=sort(new_save_gfit)
               new_save_gen=new_save_gen[*,save_rank]

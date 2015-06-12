@@ -301,7 +301,7 @@ end
 
 
 
-pro ircsrv_ga, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, mode=mode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num
+pro ircsrv_ga, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, mode=mode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num, n_lsf_ga=n_lsf_ga, _extra=ex
 
 npix=1024L
 
@@ -650,8 +650,8 @@ if visualize eq 1 then window, 0, xsize=1500, ysize=1000
 !p.multi=[0,1,5]
 
 
-for visit=0, n_ABobj-1 do begin
-
+;for visit=0, n_ABobj-1 do begin
+for visit=0,0 do begin
 
     ;get spectrum for given visit
     int_obs=ABspec_arr[visit,*]
@@ -1107,15 +1107,15 @@ for visit=0, n_ABobj-1 do begin
 
 endfor
 
-for visit=0, n_ABobj-1 do begin
-
+;for visit=1, n_ABobj-1 do begin
+for visit=0, 0 do begin
     
-    
+    fmode='ga'
                                 ;;READ IN MPFIT RUN RESULTS
     input_str=mrdfits(output_file, visit+1)
     guess=input_str.result
     
-    n_lsf_ga=4 ;MAKE KEYWORD
+    if n_elements(n_lsf_ga) eq 0 then n_lsf_ga=4 ;MAKE KEYWORD
     gh0_coeff_index=input_str.gh0_coeff_index
     n_lsf_diff=n_lsf_ga-n_elements(gh0_coeff_index)
     n_other=n_elements(input_str.other_index)
@@ -1232,9 +1232,11 @@ other_index=otherga_index
             save_gfit=dblarr(ndim)
             save_gfit=0d0
             save_igen=0
+	    save_gbest=0d0
+	    save_time=0d0
 
-            sol=solber('ga_model',ndim, npop=100L, funa=funa, lim=lim, ngen_max=500L, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen)
-            
+            ;sol=solber('ga_model',ndim, npop=npop, funa=funa, lim=lim, ngen_max=ngen_max, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen, new_save_gbest=save_gbest, new_save_time=save_time)
+            sol=solber('ga_model',ndim, funa=funa, lim=lim,gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen, new_save_gbest=save_gbest, new_save_time=save_time, _extra=ex)
             help, sol
             print, sol
 
@@ -1248,10 +1250,20 @@ other_index=otherga_index
             print, chi2
             print, input_str.chi2
             print, input_str.result
+
+            npop=ex.npop
+            ngen_max=ex.ngen_max
             
             output_str={raw_result:sol, $
                         scaled_result:real_param, $
-                        chi2:chi2 $
+                        chi2:chi2, $
+			npop:npop, $
+			ngen_max:ngen_max, $
+			save_gen:save_gen, $
+			save_gfit:save_gfit, $
+			save_igen:save_igen, $
+			save_gbest:save_gbest, $
+			save_time:save_time $
                         }
 
             n_top=15L
@@ -1261,6 +1273,9 @@ other_index=otherga_index
             print, save_gfit[0:n_top-1]
             help, save_igen
             print, save_igen[0:n_top-1]
+            help, save_gbest
+            help, save_time
+            print, save_time[-1]
 
             fmode='one_call'
             octest=rvmodel(real_param)
@@ -1272,17 +1287,19 @@ other_index=otherga_index
             window, 3, xs=700, ys=500
             plot, octest.obs, ps=6, /xs
             oplot, octest.model, ps=6, color=200
-            stop
+; fmode='ga'           
+;stop
             
             ;if file_test(output_file) then begin
             ;    fits_info, output_file, n_ext=prev_ext, /silent
             ;    extension=prev_ext+1
             ;endif else extension=1
-            output_file=strjoin([file_base, current_tag, 'ga'], '_') + '.fits'
-            mwrfits, output_str, output_file
+            output_file_new=strjoin([file_base, current_tag, 'ga'], '_') + '.fits'
+            print, output_file
+            mwrfits, output_str, output_file_new
             
         endfor
-        
+   stop     
 !p.multi=0
 
 end
