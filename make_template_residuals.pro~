@@ -199,7 +199,6 @@ end
 
 pro make_template_residuals, epoch, object, trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, min_type=min_type
 
-;run, lsf_gh
 ;run, bcvcorr_IRCS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;MAIN BODY ;;;;;;;;;;;;;;;;;;;
@@ -508,7 +507,7 @@ wl_soln_over=poly(xx_select, wl_coeff)
 ;;;;
 ;Make LSF
 ;;;;
-lsf=lsf_gh(gh_coeff, gh1_vec=gh_lin_coeff, oversamp=oversamp, npix_select=npix_select, firrst_pix=first_pix, /verbose)
+lsf=ircsrv_lsf(gh_coeff, gh1_vec=gh_lin_coeff, oversamp=oversamp, npix_select=npix_select, firrst_pix=first_pix, /verbose)
 
 ;Now fit each observation
 
@@ -597,14 +596,14 @@ endif
 
 
 
-for iter=0, 9 do begin
+for iter=0, 8 do begin
 
 
-if iter eq 9 then begin 
-    finalplot=1
-    epscall=rvfit(r)
-    stop
-endif
+;if iter eq 9 then begin 
+;    finalplot=1
+;    epscall=rvfit(r)
+;    stop
+;endif
 
 ;Make stellar template on oversampled wavelength grid
 if iter eq 0 then stellar_template_over=replicate(1d0, n_elements(int_lab_over_full)) $
@@ -628,13 +627,23 @@ if iter eq 0 then stellar_template_over=replicate(1d0, n_elements(int_lab_over_f
 
 
 if iter eq 0 then template_residuals=replicate(1d0, n_elements(wl_soln_full))
-template_residuals_dim=template_residuals[first_pix:first_pix+npix_select-1]
-template_residuals_dim=template_residuals_dim+res
-template_residuals[first_pix:first_pix+npix_select-1]=template_residuals_dim
-
+if iter lt 8 then begin 
+    template_residuals_dim=template_residuals[first_pix:first_pix+npix_select-1]
+    template_residuals_dim=template_residuals_dim+res
+    template_residuals[first_pix:first_pix+npix_select-1]=template_residuals_dim
+endif
 
 ;stop
 endfor 
+
+openw, tlun, 'template.dat', /get_lun
+for line=0, n_elements(stellar_template_over)-1 do begin
+    printf, tlun, wl_soln_over[line], stellar_template_over[line]
+endfor
+close, tlun
+free_lun, tlun
+
+stop
 
 ;OUTPUT RESULTS
 

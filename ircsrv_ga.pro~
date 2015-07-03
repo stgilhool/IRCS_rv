@@ -1,6 +1,6 @@
 function rvmodel, p, fakekey=fakekey
 
-common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npix, int_lab, wl_lab, template, wl_template, oversamp, npix_select, first_pix, observation, err, mode, visit, last_guess, visualize,wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, wl_index_total, par0_start, par0_index, par0_index_total, rv_index, rv_index_total, par1_start, par1_index, par1_index_total
+common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npix, int_lab, wl_lab, template, wl_template, oversamp, npix_select, first_pix, observation, err, mode, visit, last_guess, visualize,wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index, param_m, param_b,ghga_coeff_index, otherga_index
 
 ;Record parameters for posterity
 last_guess=p
@@ -176,10 +176,10 @@ chi2_nopen=total(chi1_vec_nopen^2, /double, /nan)
 ;;;;
 ;If visualize is set, do animation of fitting spectrum for full spectrum
 ;;;;
-run_number=par0_index*par1_index_total + par1_index + 1
-run_total=par0_index_total * par1_index_total
 
-if (visualize eq 1 or mode eq 'one_call') then begin
+
+
+if (visualize eq 1 ) then begin ;or mode eq 'one_call') then begin
 
     ;Set up big dots
     phi=findgen(32)*(!PI*2/32.)
@@ -187,7 +187,7 @@ if (visualize eq 1 or mode eq 'one_call') then begin
     usersym, cos(phi), sin(phi), /fill
 
 
-    title_str="RV shift: ["+strtrim(delta_rv,2) + ", " + strtrim(delta_rv+delta_bcv,2) +"] | visit: " + strtrim(visit,2)+ " | chi2: "+strtrim(chi2,2) + " | chi2_nopen: " + strtrim(chi2_nopen,2) + " | D_WL : [" + strtrim(wl_start,2) + ", " + strtrim(delta_wl_coeff,2) + "] | SIG : [" + strtrim(par0_start,2) + "] | GH : [" + strtrim(par1_start,2) + "] | Run: " + strtrim(run_number,2) + " / " + strtrim(run_total,2)
+    title_str="RV shift: ["+strtrim(delta_rv,2) + ", " + strtrim(delta_rv+delta_bcv,2) +"] | visit: " + strtrim(visit,2)+ " | chi2: "+strtrim(chi2,2) + " | chi2_nopen: " + strtrim(chi2_nopen,2) + " | D_WL : [" + strtrim(wl_start,2) + ", " + strtrim(delta_wl_coeff,2) + "] | SIG : [" + strtrim(sig_start,2)
 
     plot, wl_grid_select, ammonia_select,yr=[0.3,1.1], /xs, title=title_str, ytitle='NH3', charsize=1.5
     plot, wl_grid_select, stellar_select,yr=[0.3,1.1], /xs, ytitle='Star'
@@ -207,16 +207,19 @@ endif
 ;Report results
 ;;;;
 
-print, "Run: " + strtrim(run_number,2)+ " / " + strtrim(run_total,2)
+
 print, chi2, chi2_nopen
 print, "D_WL: [" + strtrim(wl_start,2) + ", " + strtrim(delta_wl_coeff,2) + "]" 
-print, "SIGMA: [" + strtrim(par0_start,2) + ", " + strtrim(gh0_coeff[0],2) + "]" 
-print, "GH: [" + strtrim(par1_start,2) + ", " + strtrim(gh0_coeff[1],2) + "]" 
+print, "SIGMA: [" + strtrim(sig_start,2) + ", " + strtrim(gh0_coeff[0],2) + "]" 
+
 print, "RV shift: ["+strtrim(delta_rv,2) + ", " + strtrim(delta_rv+delta_bcv,2) +"] "
 print, "----------"
 
 case mode of
 
+    'ga': begin
+        return, chi2
+    end
 
     'mpfit': begin
         return, chi1_vec
@@ -262,7 +265,43 @@ endcase
 end
 
 
-pro ircsrv_rvguesstest, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, mode=mode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num
+function ga_model, p, np, funa=funa
+
+common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npixels, int_lab, wl_lab, template_over, temp_wl_over, oversamp, npixselect, firstpix, int_obs, err, fmode, visit, last_guess, visual, wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index, param_m, param_b, ghga_coeff_index, otherga_index
+
+;fmode='ga'
+ga_gen=tic()
+
+param_m=funa.param_m
+param_b=funa.param_b
+
+;p_scaled=param_m*p+param_b
+
+
+
+chi2_vec=dblarr(np)
+for model_num=0, np-1 do begin
+    p_scaled=param_m*p[*,model_num]+param_b
+    chi2=rvmodel(p_scaled)
+    if chi2 lt 1 then chi2=1d10
+    chi2_vec[model_num]=chi2
+endfor
+
+help, chi2_vec
+print, minmax(chi2_vec)
+;stop
+
+ga_gen_time=toc(ga_gen)
+;print, 'one generation of ' + strtrim(np,2) + ' models takes ' + strtrim(ga_gen_time,2) + ' seconds.'
+;stop
+
+return, chi2_vec
+
+end
+
+
+
+pro ircsrv_ga, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, mode=mode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num, n_lsf_ga=n_lsf_ga, _extra=ex
 
 npix=1024L
 
@@ -278,7 +317,7 @@ if n_elements(visualize) eq 0 then visualize=1
 ;Define keywords for fitting just a range
 if n_elements(first_pix) eq 0 then first_pix=0
 if n_elements(npix_select) eq 0 then npix_select=128L;npix_select=npix-first_pix
-if n_elements(mode) eq 0 then mode='mpfit'
+if n_elements(mode) eq 0 then mode='ga'
 
 
 ;set file paths
@@ -339,7 +378,8 @@ endif else begin
 endelse
 
 ;Output file
-output_file=strjoin([file_base, current_tag, 'r'+strtrim(n_run,2)], '_') + '.fits'
+;output_file=strjoin([file_base, current_tag, 'r'+strtrim(n_run,2)], '_') + '.fits'
+output_file=strjoin([file_base, current_tag, 'mpfit'], '_') + '.fits'
 
 ;Stellar Template
 ;s_template=s_iter ;Controls which stellar template to use (0 for
@@ -447,7 +487,7 @@ calib_ext=13
 model_file=rootpath+'epoch/18Jan2011/calib_results/'+calib_file
 model_par=mrdfits(model_file, calib_ext)
 
-common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npixels, int_lab, wl_lab, template_over, temp_wl_over, oversamp, npixselect, firstpix, int_obs, err, fmode, visit, last_guess, visual, wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, wl_index_total, par0_start,par0_index, par0_index_total, rv_index, rv_index_total, par1_start, par1_index, par1_index_total
+common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npixels, int_lab, wl_lab, template_over, temp_wl_over, oversamp, npixselect, firstpix, int_obs, err, fmode, visit, last_guess, visual, wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index, param_m, param_b, ghga_coeff_index, otherga_index
 
 npixels=1024L
 visual=visualize
@@ -455,27 +495,14 @@ npixselect=npix_select
 firstpix=first_pix
 fmode=mode
 
-;Assume lin_switch is on
+;Assume lin_switch is off
 lin_switch=0
 
 ;;;Parameters from earlier calibration
-;wl
+
 wl_coeff=model_par.wl_result
 wl_scale=model_par.wl_scale
-;gh
-;gh0_guess=model_par.gh0_result
-;gh0_scale=model_par.gh0_scale
-;gh1
-;if lin_switch eq 1 then begin
-;    gh1_guess=model_par.gh1_result
-;    gh1_scale=model_par.gh1_scale
-;    gh_guess=[gh0_guess, gh1_guess]
-;    gh_scale=[gh0_scale, gh1_scale]
-;endif else begin
-;    gh_guess=gh0_guess
-;    gh_scale=gh0_scale
-;endelse
-;other
+
 other_guess=model_par.other_result
 other_scale=model_par.other_scale
 
@@ -625,18 +652,16 @@ if visualize eq 1 then window, 0, xsize=1500, ysize=1000
 
 ;for visit=0, n_ABobj-1 do begin
 for visit=0,0 do begin
-;for i=0,1 do begin
-;    vlist=[7,11]
-;    visit=vlist[i]
 
-
-;get spectrum for given visit
+    ;get spectrum for given visit
     int_obs=ABspec_arr[visit,*]
     mjd=ABmjd_arr[visit]
-;get error for this observation
+    
+    ;get error for this observation
     err=ABerr_arr[visit,*]
-;Mask entries
-;Cut off pixels on either end of full 1024 pixel spectrum
+
+    ;Mask entries
+    ;Cut off pixels on either end of full 1024 pixel spectrum
     npix_trim_start=10L
     npix_trim_end=10L
     bigerr=1d10                 ;error value for masked pixels
@@ -644,7 +669,8 @@ for visit=0,0 do begin
         err[0:npix_trim_start-1]=bigerr
         err[-1L*npix_trim_end:-1]=bigerr
     endif
-;Set error high for masked pixels
+    
+    ;Set error high for masked pixels
     if n_elements(mask) ne 0 then begin
         if n_elements(mask) ne n_elements(err) then $
           message, "mask must have same length as error vector" $
@@ -654,75 +680,58 @@ for visit=0,0 do begin
         endelse
     endif
     
-;Correct for BCV
-;get header
+    ;Correct for BCV
+    ;get header
     struct=mrdfits(ABobj_file[visit], 1)
     head=struct.header
-;get bcv correction
+    ;Get bcv correction
     bcvcorr_ircs, head, params
-    ;bcv=1000d0 * params[0]
     bcv=params[0]
     delta_bcv=bcv-bcv0
     
-;directly compare them using AMOEBA
-;;;;;;;;;;;;;;;;;;;;;;
-;;;  Run Modeling Function   ;;;;
-;;;;;;;;;;;;;;;;;;;;;;
-;FIX ADD KEYWORD
+    ;directly compare them using AMOEBA
+    ;;;;;;;;;;;;;;;;;;;;;;
+    ;;;  Run Modeling Function   ;;;;
+    ;;;;;;;;;;;;;;;;;;;;;;
+    ;FIX ADD KEYWORD
 
     
     clock=tic()
     
-;Define inputs to modeling function
+    ;Define inputs to modeling function
     ftol=1d-10
-    
+
     rv_guess=[-1*delta_bcv]
     h2o_depth_guess=[1d0]
     co2ch4_depth_guess=[1d0]
     delta_wl_guess=[1d-6]
-;delta_wl_guess=[0d0]
-    ;gh0_guess=[0.73206094d0, -0.22073388d0]
-    ;gh1_guess=[-0.00034400810d0, 0.00065816410]
-    gh0_guess=replicate(1d-1, n_bases_lsf);dblarr(n_bases_lsf)
-    ;gh1_guess=replicate(1d-1, n_bases_lsf);dblarr(n_bases_lsf)
-    gh0_scale=dblarr(n_bases_lsf)
-    ;gh1_scale=dblarr(n_bases_lsf)
-    ;gh0_guess=[0.73206094d0, -0.22073388d0,0d0,0d0]
-    ;gh1_guess=[-0.00034400810d0, 0.00065816410d0, 0d0,0d0]
+
+    gh0_guess=replicate(1d-1, n_bases_lsf)
+
+
     other_guess=replicate(1d0, n_other)
-    other_scale=dblarr(n_other)
 
 
+    gh0_scale=dblarr(n_bases_lsf)
     rv_scale=[5d4]
     h2o_depth_scale=[0.5d0]
     co2ch4_depth_scale=[0.5d0]
     delta_wl_scale=[5d-6]
-    ;delta_wl_scale=[1d-8]
-    ;gh0_scale=[1d0, 1d-1]
-    ;gh1_scale=[1d-3, 1d-5]
-    ;gh0_scale=[1d0, 1d-1,1d-1,1d-1]
-    ;gh1_scale=[1d-3, 1d-5,1d-1,1d-1]
-    
-    
-    
-    
+    other_scale=dblarr(n_other)
+
+
+    ;indices
     delta_rv_index=0
     h2o_depth_index=1
     co2ch4_depth_index=2
     delta_wl_index=lindgen(n_elements(delta_wl_guess))+co2ch4_depth_index+1
     gh0_coeff_index=lindgen(n_elements(gh0_guess))+delta_wl_index[-1]+1
     gh1_coeff_index=!values.d_nan
-    ;gh1_coeff_index=lindgen(n_elements(gh1_guess))+gh0_coeff_index[-1]+1
     other_index=lindgen(n_elements(other_guess))+gh0_coeff_index[-1]+1
     nh3_depth_index=other_index[0]
+
     if n_elements(other_index) gt 1 then $
       norm_index=other_index[1:*]
-;stop
-;delta_wl_index=3
-;gh0_coeff_index=[4,5,6,7,8,9,10]
-;gh1_coeff_index=[11,12,13,14,15,16,17]
-;other_index=[18,19,20,21,22,23,24,25,26,27,28,29,30]
-    
     nparam_total=other_index[-1]+1
     
 
@@ -733,16 +742,9 @@ for visit=0,0 do begin
         
         h2o_depth_guess=str.result[str.h2o_depth_index]
         co2ch4_depth_guess=str.result[str.co2ch4_depth_index]
-        ;delta_wl_guess=str.result[str.delta_wl_index]
-        
-        ;gh0_guess[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]=str.result[str.gh0_coeff_index[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]]
-        ;gh1_guess[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]=str.result[str.gh1_coeff_index[0:(n_bases_lsf-1) < (n_bases_lsf_in-1)]]
         
         other_guess_all=str.result[str.other_index]
         other_guess=other_guess_all[0:n_other-1]
-        
-        
-        ;if rv_guess eq 0 then rv_guess=1d-3
     endif else begin
         print, "File doesn't exist"
         openw, lun, '/home/stgilhool/RV_projects/IRCS_rv/data/rvshift1_results/errors.dat', /append, /get_lun
@@ -751,149 +753,69 @@ for visit=0,0 do begin
         free_lun, lun
 
         rv_guess=[-1d0*delta_bcv]
-        ;gh0_guess_all=[0.5d0, -0.1d0,1d-3,1d-3]
-        ;gh1_guess_all=[2d-4, 1d-4, 1d-6,1d-6]
         other_guess_all=replicate(1d0, 13)
-
-        ;gh0_guess=gh0_guess_all[0:n_bases_lsf-1]
-        ;gh1_guess=gh0_guess_all[0:n_bases_lsf-1]
         other_guess=other_guess_all[0:n_other-1]
     endelse
         
 
-;;; SCALE THE PARAMETERS TO BE OF SAMEISH ORDER
-    ;delta_wl_parscale=[1d6, 1d7]
-    rv_read=0 ;make rv starting guesses -1*d_bcv    
-    ;wl_start_list=[2.5d-14, 5d-14, 7.5d-14, 1d-13, 2.5d-13, 5d-13, 7.5d-13, 1d-12, 2.5d-12, 5d-12, 7.5d-12, 1d-11]
-    ;par0_start_list=[0.45d0, 0.5d0, 0.55d0, 0.6d0, 0.65d0, 0.7d0, 0.75d0, 0.8d0, 0.85d0, 0.9d0, 0.95d0, 1d0]
+                                ;; SCALE THE PARAMETERS TO BE OF SAMEISH ORDER
+       
     
-    ;wl_start_list=[-1d-6, -1d-7, -1d-8, -1d-9, -1d-10, -1d-11, -1d-12, -1d-13, -1d-14, -1d-15, 1d-15, 1d-14, 1d-13, 1d-12, 1d-11, 1d-10, 1d-9, 1d-8, 1d-7, 1d-6]
-    ;wl_list_neg=-10^(-1d0*(dindgen(40)/10d0)-4d0)
-    ;wl_list_pos=10^((dindgen(40)/10d0)-8d0)
-    ;wl_list_neg=-10^(-1d0*(dindgen(13)/2d0)-5d0)
-    ;wl_list_pos=10^((dindgen(13)/2d0)-9d0)
-    ;wl_start_list=[[wl_list_neg],[wl_list_pos]]
-    ;wl_start_list=[-1d-6, 1d-6]
-    
-    ;wl_start_list=(dindgen(201)-100d0)*1d-7
-    ;wl_start_list=(dindgen(101)-50d0)*1d-7
-    old_way=0
-    if old_way eq 1 then begin
-        par0_start_list=[0.65d0,0d0,0d0]
-        ;rv_start_list=(dindgen(41)-20)*0.030d0
-        ;rv_start_list=(dindgen(41)-33)*0.030d0
+    ;Readin best wl and sig from before
+    readcol, 'startingparams.txt', wl_best_list, sig_best_start, chibest, rv_best_list, format='(D,D,D,D)'
+    sig_start=sig_best_start[visit]
+    wl_start=wl_best_list[visit]
         
-        rvstep=0.05d0 ;50 m/s
-        wlstep=5d-7   ;should be roughly equal to 50 m/s
-        
-        rvbound=[-0.300,0.300]
-        wlbound=[-1d-5,1d-5]
-        
-        n_rv_trials=ceil((rvbound[1]-rvbound[0])/rvstep)
-        n_wl_trials=ceil((wlbound[1]-wlbound[0])/wlstep)
-        
-        wl_start_list=dindgen(n_wl_trials)*wlstep+wlbound[0]
-        rv_start_list=dindgen(n_rv_trials)*rvstep+rvbound[0]
-        
-    endif else begin
-        par0_start_list=[0.65d0, -1d-3]
-        ;Readin best rv and wl guesses
-        readcol, 'startingparams.txt', wl_best_list, par0_best_start, chbest, rv_best_list, format='(D,D,D,D)'
-        par0_start_list[0]=par0_best_start[visit]
-        wl_start_list=wl_best_list[visit]
-        rv_start_list=rv_best_list[visit]
-        wl_start=wl_start_list
-        rv_start=rv_start_list
-    endelse
-    
-    ;par0_start_list=dindgen(11)*0.05d0+0.35d0
-    ;par1_start_list=dindgen(41)*0.01d0-0.2d0
-    ;par0_start_list=dindgen(41)*0.005d0+0.6d0
-    ;par1_start_list=dindgen(41)*0.005d0-0.1d0
-    par0_start_list=dindgen(61)*0.01d0-0.3d0
-    par1_start_list=dindgen(101)*0.0004d0-0.005d0
 
-    wl_index_total=n_elements(wl_start_list)
-    rv_index_total=n_elements(rv_start_list)
-    par0_index_total=n_elements(par0_start_list)
-    par1_index_total=n_elements(par1_start_list)
     
-
-;;;FOREACH LOOP STARTS HERE    
-    ;foreach wl_start, wl_start_list, wl_index do begin
-    foreach par0_start, par0_start_list, par0_index do begin
-        foreach par1_start, par1_start_list, par1_index do begin
-        ;    foreach rv_start, rv_start_list, rv_index do begin
             
-            ;Assign starting value
-            
-            ;if rv_read eq 0 then rv_guess=[-1d0*delta_bcv+rv_start] else rv_guess=str.delta_rv
-            
-            rv_guess=[-1d0*delta_bcv+rv_start_list]
-            
-            delta_wl_parscale=abs(1d0/wl_start_list)
-            delta_wl_guess=wl_start_list*delta_wl_parscale
-            
-            
-            ;MESSING WITH SIGMA
-            gh0_guess=[0.690d0,par0_start,par1_start]
-            
-            ;gh1_guess=gh1_guess*gh1_parscale
-            
-            parscale_all=replicate(1d0, nparam_total)
-            parscale_all[delta_wl_index] = delta_wl_parscale
-            
-            ;parscale_all[gh1_coeff_index] = gh1_parscale
-            
-            ;MESS WITH NORMALIZATION
-            other_guess=other_guess[0:n_other-1]
-            other_scale=other_scale[0:n_other-1]
-
-            guess=[rv_guess, h2o_depth_guess, co2ch4_depth_guess, delta_wl_guess, gh0_guess, other_guess]
-            scale=[rv_scale, h2o_depth_scale, co2ch4_depth_scale, delta_wl_scale, gh0_scale, other_scale]
-            
-            guess=guess*parscale_all
-            scale=scale*parscale_all
-            
-            ;delta_wl_guess=delta_wl_guess*delta_wl_parscale
-            
+                       
             ;Define mpfit constraints
             parinfo = replicate({parname:'null' , value:0d0 , step:0d0 , relstep:0d0 ,fixed:0, limited:[0,0], $
                                  limits:[0.D,0.D], mpside:0}, nparam_total)
             
   ;;; --- DELTA_RV ---
+            ;Name
             parinfo[delta_rv_index].parname='delta_rv' ;in km/s
             
+            ;Scaling
+            delta_rv_parscale=1d0
             
-            ;if rv_guess[0] eq 0 then rv_guess[0]=1d-3
-            
+            ;Value
             parinfo[delta_rv_index].value = rv_guess[0]
             
-            ;Define step size
+            ;Step
             parinfo[delta_rv_index].step = 1d-5 ;Step size is 0.01m/s
             
-            ;Constrain DELTA_RV
-            ;if run eq 1 then begin
-            parinfo[delta_rv_index].limited = [1,1]
-            parinfo[delta_rv_index].limits = [rv_guess-1d0, rv_guess+1d0]
-            parinfo[delta_rv_index].mpside = 2
-            ;parinfo[delta_rv_index].fixed = 1 ;Fix delta_rv on initial runs
-            ;endif else parinfo[delta_rv_index].fixed = 1 ;Fix delta_rv on initial runs
+            ;Contraints
+            if run eq 1 then begin
+                parinfo[delta_rv_index].limited = [1,1]
+                if rv_guess[0] eq 0 then rv_guess[0]=1d-3
+                parinfo[delta_rv_index].limits = [rv_guess-1d0, rv_guess+1d0]
+                parinfo[delta_rv_index].mpside = 2    
+            endif else parinfo[delta_rv_index].fixed = 1 ;Fix delta_rv on initial runs
             
             
   ;;; --- TELLURIC ---
+            ;Name
             parinfo[h2o_depth_index].parname = 'h2o_depth'
             parinfo[co2ch4_depth_index].parname = 'co2ch4_depth'
             
-            ;Assign TELLURIC values
+            ;Scaling
+                                ;;Unnecessary because they are
+                                ;;necessarily between 0 and 1
+            h2o_depth_parscale=1d0
+            co2ch4_depth_parscale=1d0
+
+            ;Values
             parinfo[h2o_depth_index].value = h2o_depth_guess
             parinfo[co2ch4_depth_index].value = co2ch4_depth_guess
             
-            ;Define step size
+            ;Step
             parinfo[h2o_depth_index].relstep = 1d-2
             parinfo[co2ch4_depth_index].relstep = 1d-2
             
-            ;Constrain optical depths
+            ;Constraints
             parinfo[h2o_depth_index].limited=[1,1]
             parinfo[co2ch4_depth_index].limited=[1,1]
             
@@ -902,79 +824,96 @@ for visit=0,0 do begin
             
             
   ;;; --- DELTA WL ---
+            ;Name
             for pnum = 0, n_elements(delta_wl_index)-1 do begin
                 parinfo[delta_wl_index[pnum]].parname = 'delta_wl_coeff_'+strtrim(pnum,2)
             endfor
             
-            ;Assign starting values
+            ;Scaling
+            delta_wl_parscale=1d0/wl_start
+    
+    
+            ;Values
+            delta_wl_guess=wl_start*delta_wl_parscale
             parinfo[delta_wl_index].value = delta_wl_guess
-            ;parinfo[delta_wl_index].value = 0d0
             
-            ;Define step size
+            ;Step
             parinfo[delta_wl_index].step = 1d-8*delta_wl_parscale
-            ;parinfo[delta_wl_index].step = 5d-3
             
-            ;Constrain
-            ;parinfo[delta_wl_index].limited = 1
+            
+            ;Constraints
+            
             parinfo[delta_wl_index].mpside = 2
-            ;parinfo[delta_wl_index].fixed = 1
+                                ;;Reasonable limit, if you want to use
+                                ;;parinfo[delta_wl_index].limited = [1,1]
+                                ;;parinfo[delta_wl_index].limits = [-1d-5, 1d-5]*abs(delta_wl_parscale)
             
-            ;parinfo[delta_wl_index].limits = [-1d-5, 1d-5]*abs(delta_wl_parscale)
-            ;parinfo[delta_wl_index[1]].limits = [-1d-6, 1d-6]*delta_wl_parscale[1]
             
   ;;; --- GH0 ---
+            ;Name
             for pnum = 0, n_elements(gh0_coeff_index)-1 do begin
+                if pnum eq 0 then parinfo[gh0_coeff_index[pnum]].parname = 'Sigma' else $
                 parinfo[gh0_coeff_index[pnum]].parname = 'gh0_'+strtrim(pnum,2)
             endfor
+            ;Scaling
+            gh0_coeff_parscale=replicate(1d0, n_elements(gh0_coeff_index))
+
+            ;Values
+            for pnum = 0, n_elements(gh0_coeff_index)-1 do begin                
+                if pnum eq 0 then parinfo[gh0_coeff_index[pnum]].value = sig_start else $
+                  parinfo[gh0_coeff_index[pnum]].value = gh0_guess[pnum]
+            endfor
+
+            ;Step
+            parinfo[gh0_coeff_index].step = replicate(1d-5, n_elements(gh0_coeff_index))
             
-            ;Assign starting values
-            parinfo[gh0_coeff_index].value = gh0_guess
-            
-            ;Define step size
-            
-                        
-            ;parinfo[gh0_coeff_index].step = [1d-5, 1d-7]
-            ;parinfo[gh0_coeff_index].mpside=2
-            
-            
-            
-            ;Constrain
-            parinfo[gh0_coeff_index].fixed=1
-            
-            
-            
-  ;;; --- GH1 ---
-            ;  for pnum = 0, n_elements(gh1_coeff_index)-1 do begin
-            ;         parinfo[gh1_coeff_index[pnum]].parname = 'gh1_'+strtrim(pnum,2)
-            ;     endfor
-            
-            ;     ;Assign starting values
-            ;     parinfo[gh1_coeff_index].value = gh1_guess
-            
-            ;     ;Define step size
-            ;     parinfo[gh1_coeff_index].relstep = 1d-1
-            
-            ;     ;Constrain
-            ;     parinfo[gh1_coeff_index].limited = 0
-            
+            ;Constraints
+                                ;;Generous limits on sigma
+            parinfo[gh0_coeff_index[0]].limited=[1,1]
+            parinfo[gh0_coeff_index[0]].limits=[0.2d0,1.5d0]
+                                ;;parinfo[gh0_coeff_index].fixed=1
+                                ;;parinfo[gh0_coeff_index].mpside=2
+
             
   ;;; --- OTHER ---
+            ;Name
             for pnum = 0, n_elements(other_index)-1 do begin
                 parinfo[other_index[pnum]].parname = 'other_'+strtrim(pnum,2)
             endfor
             
-            ;Assign starting values
-            parinfo[other_index].value = other_guess
+            ;Scaling
+            other_parscale=replicate(1d0, n_elements(other_index))
             
-            ;Define step size
+            ;Values
+            parinfo[other_index].value = other_guess * other_parscale
+            
+            ;Step
             parinfo[other_index].relstep = 1d-3
             
-            ;Constrain
+            ;Constraints
             parinfo[other_index].limited=[1,1]
             parinfo[other_index].limits=[0,1.5]
+    
+
+  ;;; --- ALL TOGETHER NOW ---
+            ;Scaling
+            parscale_all=replicate(1d0, nparam_total)
             
+            parscale_all[delta_rv_index] = delta_rv_parscale
+            parscale_all[h2o_depth_index] = h2o_depth_parscale
+            parscale_all[co2ch4_depth_index] = co2ch4_depth_parscale
+            parscale_all[delta_wl_index] = delta_wl_parscale
+            parscale_all[gh0_coeff_index] = gh0_coeff_parscale
+            parscale_all[other_index] = other_parscale
             
-            ;Check Starting Values
+    
+            guess=parinfo.value
+            scale=[rv_scale, h2o_depth_scale, co2ch4_depth_scale, delta_wl_scale, gh0_scale, other_scale]
+            
+            ;scale=scale*parscale_all
+        
+            
+  ;;;  ----  Check Starting Values
             start_check=1
             start_check_print=0
             
@@ -1042,8 +981,6 @@ for visit=0,0 do begin
                           function_value=fval, nmax=150000L)
                 chi2=fval[0]
             endif else if fmode eq 'mpfit' then begin
-                ;r=mpfit('rvmodel', guess, bestnorm=chi2, ftol=ftol,
-                ;parinfo=parinfo, status=status, /quiet)
                 r=mpfit('rvmodel', bestnorm=chi2, ftol=ftol, parinfo=parinfo, status=status, /quiet)
                 fmode='one_call'
                 ;print, "R before onecall: ", r
@@ -1070,7 +1007,7 @@ for visit=0,0 do begin
                 ocstr=rvmodel(guess)
                 status=-111
                 ;if visit eq 5 or visit eq 6 or visit eq 7 then stop
-            endif
+            endif else if fmode eq 'ga' then break
             
             
             
@@ -1145,17 +1082,15 @@ for visit=0,0 do begin
                         MODE:fmode, $
                         CHI2:chi2, $
                         CHI2_NOPEN:chi2_nopen, $
-                        ;WL_GRID:wl_grid, $
-                        ;MODEL_SELECT:model_select, $
-                        ;OBS_SELECT:obs_select, $
-                        ;ERR_SELECT:err_select, $
-                        ;LSF:lsf, $
-                        WL_START:wl_start_list, $
-                          WL_RESULT:r[delta_wl_index], $
-                          PAR0_START:par0_start, $
-                          PAR1_START:par1_start, $
-                          PAR0_RESULT:r[gh0_coeff_index[0]], $
-                          PAR1_RESULT:r[gh0_coeff_index[1]], $
+                        WL_GRID:wl_grid, $
+                        MODEL_SELECT:model_select, $
+                        OBS_SELECT:obs_select, $
+                        ERR_SELECT:err_select, $
+                        LSF:lsf, $
+                        ;WL_START:wl_start, $
+                        ;WL_RESULT:r[delta_wl_index], $
+                        ;SIG_START:sig_start, $
+                        ;SIG_RESULT:r[gh0_coeff_index[0]], $
                         MJD:mjd, $
                         BCV:bcv, $
                         DELTA_BCV:delta_bcv, $
@@ -1166,17 +1101,205 @@ for visit=0,0 do begin
                         CHI2_FLAG:chi2_flag $
                        }
             
-            if par0_index eq 0 and par1_index eq 0 then output_str_arr=replicate(output_str, par0_index_total, par1_index_total) $
-              else output_str_arr[par0_index, par1_index]=output_str
             
-            
-        endforeach
-     endforeach
 
-    if fmode ne 'one_call' then mwrfits, output_str_arr, output_file
+    if fmode ne 'one_call' then mwrfits, output_str, output_file
 
 endfor
+
+;for visit=1, n_ABobj-1 do begin
+for visit=0, 0 do begin
+    
+    fmode='ga'
+                                ;;READ IN MPFIT RUN RESULTS
+    input_str=mrdfits(output_file, visit+1)
+    guess=input_str.result
+    
+    if n_elements(n_lsf_ga) eq 0 then n_lsf_ga=4 ;MAKE KEYWORD
+    gh0_coeff_index=input_str.gh0_coeff_index
+    n_lsf_diff=n_lsf_ga-n_elements(gh0_coeff_index)
+    n_other=n_elements(input_str.other_index)
+    
+    ga_guess=dblarr(n_elements(guess)+n_lsf_diff)
+    ga_guess[0:gh0_coeff_index[0]]=guess[0:gh0_coeff_index[0]]
+    if n_lsf_diff ge 1 then begin
+        ga_guess[gh0_coeff_index[0]+1:gh0_coeff_index[0]+n_lsf_diff]=replicate(0.5d0, n_lsf_diff)
+        ga_guess[gh0_coeff_index[0]+n_lsf_diff+1:*]=guess[gh0_coeff_index[0]+1:*]
+    
+;        help, guess
+;        print, guess
+;        help, ga_guess
+;        print, ga_guess
+;        stop
         
+        
+        ghga_coeff_index=lindgen(n_lsf_ga)+gh0_coeff_index[0]
+        help, gh0_coeff_index
+        print, gh0_coeff_index
+        
+        otherga_index=lindgen(n_other)+ ghga_coeff_index[-1]+1
+        help, otherga_index
+        print, otherga_index
+        
+    endif else begin
+        ga_guess=guess
+        ghga_coeff_index=gh0_coeff_index
+        otherga_index=other_index
+    endelse
+    
+    ndim=n_elements(ga_guess)
+;    help, ndim
+;    print, ndim
+
+
+
+;save and rename old common block variables
+parscale_all_save=parscale_all
+parscale_all=replicate(1d0, ndim)
+gh0_coeff_index_save=gh0_coeff_index
+gh0_coeff_index=ghga_coeff_index
+other_index_save=other_index
+other_index=otherga_index
+
+    ;;SCALE SO THAT THE PARAMETERS ARE have limits at 0 and 1
+    
+
+  ;;; --- DELTA_RV ---
+            
+            ;Scaling
+            delta_rv_m=0.8d0
+            delta_rv_b=ga_guess[delta_rv_index]-(delta_rv_m/2d0)
+            
+            
+  ;;; --- TELLURIC ---
+            
+            ;Scaling
+
+            h2o_m=0.01d0
+            co2ch4_m=0.01d0
+            h2o_b=ga_guess[h2o_depth_index]-(h2o_m/2d0)
+            co2ch4_b=ga_guess[co2ch4_depth_index]-(co2ch4_m/2d0)
+            
+            
+  ;;; --- DELTA WL ---
+            
+            ;Scaling
+            delta_wl_m=2d-5
+            delta_wl_b=ga_guess[delta_wl_index]-(delta_wl_m/2d0)
+            
+  ;;; --- GH0 ---
+
+            ;Scaling
+            sig_m=0.1d0
+            sig_b=ga_guess[ghga_coeff_index[0]]-(sig_m/2d0)
+            gh0_m=replicate(1d0, n_lsf_diff)
+            gh0_b=replicate(-0.5d0, n_lsf_diff)
+            
+  ;;; --- OTHER ---
+            
+            ;Scaling
+            nh3_m=0.01d0
+            nh3_b=ga_guess[otherga_index[0]]-(nh3_m/2d0)
+            other_m=0.02d0
+            other_b=ga_guess[otherga_index[1:*]]-(other_m/2d0)
+
+  ;;; --- ALL TOGETHER NOW ---
+
+            param_m=[delta_rv_m, $
+                     h2o_m, $
+                     co2ch4_m, $
+                     delta_wl_m, $
+                     sig_m, $
+                     gh0_m, $
+                     nh3_m, $
+                     other_m $
+                     ]
+            
+            param_b=[delta_rv_b, $
+                     h2o_b, $
+                     co2ch4_b, $
+                     delta_wl_b, $
+                     sig_b, $
+                     gh0_b, $
+                     nh3_b, $
+                     other_b $
+                     ]
+            
+            lim=rebin([0,1], 2, ndim)
+            fitness=0d0
+
+            funa={param_m:param_m, param_b:param_b}
+            save_gfit=dblarr(ndim)
+            save_gfit=0d0
+            save_igen=0
+	    save_gbest=0d0
+	    save_time=0d0
+
+            ;sol=solber('ga_model',ndim, npop=npop, funa=funa, lim=lim, ngen_max=ngen_max, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen, new_save_gbest=save_gbest, new_save_time=save_time)
+            sol=solber('ga_model',ndim, funa=funa, lim=lim,gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen, new_save_gbest=save_gbest, new_save_time=save_time, _extra=ex)
+            help, sol
+            print, sol
+
+            real_param=param_m*sol+param_b
+            help, real_param
+            print, real_param
+
+            chi2=fitness
+
+            help, chi2
+            print, chi2
+            print, input_str.chi2
+            print, input_str.result
+
+            npop=ex.npop
+            ngen_max=ex.ngen_max
+            
+            output_str={raw_result:sol, $
+                        scaled_result:real_param, $
+                        chi2:chi2, $
+			npop:npop, $
+			ngen_max:ngen_max, $
+			save_gen:save_gen, $
+			save_gfit:save_gfit, $
+			save_igen:save_igen, $
+			save_gbest:save_gbest, $
+			save_time:save_time $
+                        }
+
+            n_top=15L
+            help, save_gen
+            print, reform(save_gen[0,0:n_top-1], n_top)
+            help, save_gfit
+            print, save_gfit[0:n_top-1]
+            help, save_igen
+            print, save_igen[0:n_top-1]
+            help, save_gbest
+            help, save_time
+            print, save_time[-1]
+
+            fmode='one_call'
+            octest=rvmodel(real_param)
+            device, decomposed=1
+            window, 1, xs=700, ys=500
+            plot, octest.lsf[*,0], /xs
+            window, 2, xs=700, ys=500
+            plot, octest.residuals, ps=3, /xs
+            window, 3, xs=700, ys=500
+            plot, octest.obs, ps=6, /xs
+            oplot, octest.model, ps=6, color=200
+; fmode='ga'           
+;stop
+            
+            ;if file_test(output_file) then begin
+            ;    fits_info, output_file, n_ext=prev_ext, /silent
+            ;    extension=prev_ext+1
+            ;endif else extension=1
+            output_file_new=strjoin([file_base, current_tag, 'ga'], '_') + '.fits'
+            print, output_file
+            mwrfits, output_str, output_file_new
+            
+        endfor
+   stop     
 !p.multi=0
 
 end

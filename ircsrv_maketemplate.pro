@@ -1,13 +1,18 @@
 function rvfit, p
 
-common rvinfo, wl_soln, wl_soln_full, samp_index, wl_soln_over_full, int_lab_over_full, int_obs, lsf, npix_lsf, npix_model, first_pix, npix_select, oversamp, norm_factor, err, visualize, npix_trim_start, npix_trim_end, min_type, nparam_other, last_guess, nlines, COwl_shift, h2o, co2ch4, tellwl, visit, iter, template_residuals,res, stellar_template_over, finalplot
+common rvinfo, wl_soln, wl_soln_full, samp_index, wl_soln_over_full, int_lab_over_full, int_obs, lsf, npix_lsf, npix_model, first_pix, npix_select, oversamp, nnorm, err, visualize, npix_trim_start, npix_trim_end, min_type, nparam_other, last_guess, nlines, COwl_shift, h2o, co2ch4, tellwl, visit, iter, template_residuals,res, stellar_template_over, finalplot, int_lab, wl_lab, lab_depth_switch, norm_switch
+
+lab_depth=lab_depth_switch
+norm=norm_switch
 
 last_guess=p
 
 delta_rv = 0d0
 
-co2ch4_depth=p[0]
-h2o_depth=p[1]
+co2ch4_tau=p[0]
+h2o_tau=p[1]
+if lab_depth eq 1 then nh3_tau=p[2]
+if norm eq 1 then norm_pts_y=p[-1*nnorm:-1]
 
 
 bigc=299792458d0 ;m/s 
@@ -24,11 +29,13 @@ wl_shifted=wl_soln_over_full*(1d0+(delta_rv/bigc))
 
 ;Deal with telluric
 ;scale telluric depth
-h2o_depth=h2o^h2o_depth
-co2ch4_depth=co2ch4^co2ch4_depth
+h2o_depth=h2o^h2o_tau
+co2ch4_depth=co2ch4^co2ch4_tau
+if lab_depth eq 1 then nh3_depth=int_lab^nh3_tau
 
 h2o_shift=interpol(h2o_depth, tellwl, wl_soln_over_full)
 co2ch4_shift=interpol(co2ch4_depth, tellwl, wl_soln_over_full)
+if lab_depth eq 1 then int_lab_over_full=interpol(nh3_depth, wl_lab, wl_soln_over_full)
 
 ;;;;;;;
 ;multiply and convolve
@@ -83,8 +90,33 @@ int_model=int_avg[samp_index]
 ;;;;
 ;Correct subtle variations in continuum
 ;;;;
+ 
+if norm gt 0 then begin    
+    
+    ;X vector of same dimensions as ircs-resolution spectrum
+    norm_pts_xx=lindgen(npix_select)+first_pix
+    
+    ;Create and populate vector with x-coord of node pts
+    norm_pts_x=dblarr(nnorm)
+    
+    if nnorm ge 2 then begin
+        norm_pts_x[0]=first_pix
+        norm_pts_x[nnorm-1]=first_pix+npix_select-1
+        if nnorm ge 3 then begin
+            x_increment=npix_select/(nnorm-1)
+            for i=1, nnorm-2 do norm_pts_x[i]=norm_pts_x[i-1]+x_increment
+        endif
+        
+        ;Interpolate between nodes with a spline
+        if npix_select ge 128L and nnorm ge 5 then norm_factor=interpol(norm_pts_y, norm_pts_x, norm_pts_xx, /spline) $
+        else norm_factor=interpol(norm_pts_y, norm_pts_x, norm_pts_xx)
+    endif else if nnorm eq 1 then norm_factor=replicate(norm_pts_y, npix_select) 
 
-;if nparam_other gt 0 then int_model=int_model*norm_factor
+int_model=int_model*norm_factor   
+
+endif
+    
+
 
 
 
@@ -105,8 +137,8 @@ res2=res^2
 dev=res/err_dim
 dev2=dev^2
 
-chi1_vec=dev[npix_trim_start:-1*(npix_trim_end+1)]
-chi2_vec=dev2[npix_trim_start:-1*(npix_trim_end+1)]
+chi1_vec=dev;[npix_trim_start:-1*(npix_trim_end+1)]
+chi2_vec=dev2;[npix_trim_start:-1*(npix_trim_end+1)]
 chi2=total(chi2_vec, /double, /nan)
 
 
@@ -140,7 +172,7 @@ set_plot, 'x'
 if finalplot eq 1 then begin
     !p.multi=0
     ;Make Postscript
-    set_plot, 'ps
+    set_plot, 'ps'
     device, /encapsulated, filename = 'nessf.eps'
     device, /color, bits=8
     loadct, 12
@@ -186,6 +218,7 @@ endif
 
 
 print, chi2
+print, last_guess
 print, "----------"
 
 
@@ -197,7 +230,7 @@ else message, 'incorrect min_type... cannot return a chi2 value'
 end
 
 
-pro ircsrv_maketemplate, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, min_type=min_type
+pro ircsrv_maketemplate, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, min_type=min_type, lab_depth=lab_depth, norm=norm
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;MAIN BODY ;;;;;;;;;;;;;;;;;;;
@@ -209,7 +242,7 @@ if n_elements(object) eq 0 then object='GJ273'
 if n_elements(tract) eq 0 then trace='AB'
 
 ;CAUTION: I'm fixing the following variable temporarily
-npix_select=150L
+;npix_select=150L
 
 npix=1024L
 if n_elements(visualize) eq 0 then visualize=0
@@ -217,6 +250,8 @@ if n_elements(visualize) eq 0 then visualize=0
 if n_elements(first_pix) eq 0 then first_pix=0
 if n_elements(npix_select) eq 0 then npix_select=npix-first_pix
 if n_elements(min_type) eq 0 then min_type='mpfit'
+if n_elements(lab_depth) eq 0 then lab_depth=0
+if n_elements(norm) eq 0 then norm=0
 
 
 ;set file paths
@@ -361,8 +396,12 @@ model_file=calibpath+calib_file
 model_par=mrdfits(model_file, calib_ext)
 
 
-common rvinfo, wl_soln, wl_soln_full, samp_index, wl_soln_over_full, int_lab_over_full, int_obs, lsf, npix_lsf, npix_model, firstpix, npixselect, oversamp, norm_factor, err, visual, npix_trim_start, npix_trim_end, mintype, nparam_other, last_guess, nlines, COwl_shift, h2o, co2ch4, tellwl, visit, iter, template_residuals, res, stellar_template_over, finalplot
+common rvinfo, wl_soln, wl_soln_full, samp_index, wl_soln_over_full, int_lab_over_full, int_obs, lsf, npix_lsf, npix_model, firstpix, npixselect, oversamp, nnorm, err, visual, npix_trim_start, npix_trim_end, mintype, nparam_other, last_guess, nlines, COwl_shift, h2o, co2ch4, tellwl, visit, iter, template_residuals, res, stellar_template_over, finalplot, int_lab, wl_lab, lab_depth_switch, norm_switch
 
+
+
+lab_depth_switch=lab_depth
+norm_switch=norm
 visual=visualize
 npixselect=npix_select
 firstpix=first_pix
@@ -403,18 +442,18 @@ nparam_other=n_elements(other)
 nparam_gh1=nparam-nparam_wl-nparam_gh-nparam_other
 
 
-if n_elements(other) gt 1 then begin
-    nparam_norm=nparam_other-1
-    x_x=lindgen(npix_select)+first_pix
-    x_norm=dblarr(nparam_norm)
-    x_norm[0]=first_pix
-    x_norm[nparam_norm-1]=first_pix+npix_select-1
-    x_increment=npix_select/(nparam_norm-2)
-    for i=1, nparam_norm-2 do x_norm[i]=x_norm[i-1]+x_increment
+;if n_elements(other) gt 1 then begin
+;    nparam_norm=nparam_other-1
+;    x_x=lindgen(npix_select)+first_pix
+;    x_norm=dblarr(nparam_norm)
+;    x_norm[0]=first_pix
+;    x_norm[nparam_norm-1]=first_pix+npix_select-1
+;    x_increment=npix_select/(nparam_norm-2)
+;    for i=1, nparam_norm-2 do x_norm[i]=x_norm[i-1]+x_increment
 
-    norm_factor=interpol(norm_pts, x_norm, x_x, /spline)    
+;    norm_factor=interpol(norm_pts, x_norm, x_x, /spline)    
     
-endif
+;endif
 ;;;
 
 ;Other parameters and constants
@@ -454,20 +493,45 @@ int_lab=int_lab_copy/norm_lab
 
 ;Adjust the optical depth of the lab spectrum (I think this is okay to
 ;do for the high-resolution spectrum even though the wl scale isn't linear)
-int_lab_depth=int_lab^tau_scale
+if lab_depth eq 0 then int_lab_depth=int_lab^tau_scale
+
 
 
 ;read in telluric spectrum
 ;tell=mrdfits(modelpath+'skytable.fits', 1)
 ;tellwl=tell.lam
 ;telluric=tell.trans
-h2ostr=mrdfits(modelpath+'sky_h2o.fits',1)
-co2ch4str=mrdfits(modelpath+'sky_co2andch4.fits', 1)
 
-tell_wl_long=h2ostr.wave
-m24index=where(tell_wl_long gt 2.275 and tell_wl_long lt 3.365)
-h2o_long=h2ostr.trans
-co2ch4_long=co2ch4str.trans
+old_tell=0
+if old_tell eq 1 then begin
+    h2ostr=mrdfits(modelpath+'sky_h2o.fits',1)
+    co2ch4str=mrdfits(modelpath+'sky_co2andch4.fits', 1)
+    tell_wl_long=h2ostr.wave
+    m24index=where(tell_wl_long gt 2.275 and tell_wl_long lt 2.365)
+    
+    h2o_long=h2ostr.trans
+    co2ch4_long=co2ch4str.trans
+endif else begin
+
+    h2ostr=mrdfits(modelpath+'tapas_h2ovac.fits',1)
+    co2ch4str=mrdfits(modelpath+'tapas_co2ch4vac.fits', 1)
+
+;    h2ostr=mrdfits(modelpath+'tapas_h2onovac.fits',1)
+;    co2ch4str=mrdfits(modelpath+'tapas_co2ch4novac.fits', 1)
+
+
+    tell_wl_long=h2ostr.wavelength/1000d0
+    tell_wl_long=reverse(tell_wl_long)
+    
+    m24index=where(tell_wl_long gt 2.275 and tell_wl_long lt 2.365)
+    
+    h2o_long=h2ostr.transmittance
+    h2o_long=reverse(h2o_long)
+
+    co2ch4_long=co2ch4str.transmittance
+    co2ch4_long=reverse(co2ch4_long)
+endelse
+
 tellwl=tell_wl_long[m24index]
 h2o=h2o_long[m24index]
 co2ch4=co2ch4_long[m24index]
@@ -483,7 +547,7 @@ wl_soln=poly(x, wl_coeff)
 wl_soln_over=poly(xx, wl_coeff)
 
 ;Interpolate the lab spectrum onto the oversampled trial grid
-int_lab_over_full=interpol(int_lab_depth, wl_lab, wl_soln_over)
+if lab_depth eq 0 then int_lab_over_full=interpol(int_lab_depth, wl_lab, wl_soln_over)
 
 ;Save full length vectors
 wl_soln_full=wl_soln
@@ -510,193 +574,225 @@ wl_soln_over=poly(xx_select, wl_coeff)
 ;;;;
 ;Make LSF
 ;;;;
-lsf=ircsrv_lsf(gh_coeff, gh1_vec=gh_lin_coeff, oversamp=oversamp, npix_select=npix_select, firrst_pix=first_pix, /verbose)
+
+lsf=ircsrv_lsfold(gh_coeff, gh1_vec=gh_lin_coeff, oversamp=oversamp, npix_select=npix_select, first_pix=first_pix, /verbose)
 
 ;Now fit each observation
 
-for visit=0, n_ABobj-1 do begin
-;for visit=0, 0 do begin
-
+;for visit=0, n_ABobj-1 do begin
+for visit=0, 13 do begin
+    
 ;Define Template
 ;temp=ABtemp_rough
-bigc=299792458d0 ;m/s
-
+    bigc=299792458d0 ;m/s
+    
 ;get header
-struct=mrdfits(ABobj_file[visit], 1)
-head=struct.header
+    struct=mrdfits(ABobj_file[visit], 1)
+    head=struct.header
 ;get bcv correction
-bcvcorr_ircs, head, params
-bcv=params[0]
-if visit eq 0 then bcv0=bcv
-
+    bcvcorr_ircs, head, params
+    bcv=params[0]
+    if visit eq 0 then bcv0=bcv
+    
 ;read in observation
     int_obs=ABspec_arr[visit,*]
-	;date and
+    ;date and
     mjd=ABmjd_arr[visit]
-	;errors
+    ;errors
     err=ABerr_arr[visit, *]
-	;don't count first and last few
-    err[0:20]=1d8
-    err[-21:-1]=1d8
-
-
-
-
+    ;don't count first and last few
+    err[0:9]=1d8
+    err[-10:-1]=1d8
+    ;or the middle few
+    err[502:521]=1d8
+    
+    
+    
+    
 ;directly compare them using AMOEBA
 ;;;;;;;;;;;;;;;;;;;;;;
 ;;;  Run Modeling Function   ;;;;
 ;;;;;;;;;;;;;;;;;;;;;;
-
-clock=tic()
-
+    
+    clock=tic()
+    
 ;Define inputs to modeling function
-ftol=1d-11
-
-
-co2ch4_depth_guess=[0.3d0]
-h2o_depth_guess=[0.3d0]
-
-co2ch4_depth_scale=[0.2d0]
-h2o_depth_scale=[0.2d0]
-
-;;;;LEFT OFF HERE: ADD 
-;-norm factor free parameters
-;-returning of x coords of norm points
-;-constraint that template stays between 0 and 1
-
-guess=[co2ch4_depth_guess, h2o_depth_guess]
-scale=[co2ch4_depth_scale, h2o_depth_scale]
-
-
-if visualize eq 1 then begin
-    set_plot, 'x'
-    window, 0, xsize=1500, ysize=650
-endif
-!p.multi=[0,1,5]
+    ftol=1d-11
+    
+    if old_tell eq 1 then begin
+        co2ch4_depth_guess=[0.3d0]
+        h2o_depth_guess=[0.3d0]
+    endif else begin
+        co2ch4_depth_guess=[0.05d0]
+        h2o_depth_guess=[0.5d0]
+    endelse
+    
+    co2ch4_depth_scale=co2ch4_depth_guess;[0.45d0]
+    h2o_depth_scale=h2o_depth_guess;[0.45d0]
+    
+    guess=[co2ch4_depth_guess, h2o_depth_guess]
+    scale=[co2ch4_depth_scale, h2o_depth_scale]
+    
+    if lab_depth eq 1 then begin
+        nh3_depth_guess=tau_scale
+        nh3_depth_scale=0.1*tau_scale
+        guess=[guess, nh3_depth_guess]
+        scale=[scale, nh3_depth_scale]
+    endif
+    
+    
+    if norm ne 0 then begin
+        nnorm=2 > npix_select/50
+        norm_guess=replicate(1d0,nnorm)
+        norm_scale=replicate(0.1d0,nnorm)
+        
+        guess=[guess, norm_guess]
+        scale=[scale, norm_scale]
+    endif else nnorm=0
+    
+    
+    
+    if visualize eq 1 then begin
+        set_plot, 'x'
+        window, 0, xsize=1500, ysize=650
+    endif
+    !p.multi=[0,1,5]
 ;!p.multi=0
 ;;;Run Minimization scheme
-
+    
 ;read in last guess
 ;guess=[-2799.7870,-1081.8196,      0.99741826,      0.20462968,      0.12492732,      0.40048046,   8.1290099d-05,   0.00011054021,   2.2794023d-05]
 ;r=rvfit(guess)
 ;stop
-
-
-
-for iter=0, 8 do begin
-
-
+    
+    nparam_total=n_elements(guess)
+    
+    parinfo = replicate({limited:[1,1], $
+                         limits:[0.D,1.D], mpside:0}, nparam_total)
+;parinfo[2:2+nnorm-1].limits=[0.85d0,1.15d0]            
+    
+    for iter=0, 8 do begin
+        
+        
 ;if iter eq 9 then begin 
 ;    finalplot=1
 ;    epscall=rvfit(r)
 ;    stop
 ;endif
-
+        
 ;Make stellar template on oversampled wavelength grid
-if iter eq 0 then stellar_template_over=replicate(1d0, n_elements(int_lab_over_full)) $
-  else stellar_template_over=interpol(template_residuals, wl_soln_full, wl_soln_over_full)
-
-
-    if min_type eq 'amoeba' then begin
-        r=amoeba3(ftol, scale=scale, p0=guess,function_name='rvfit', $
-                  function_value=fval, nmax=150000L)
-        chi2=fval[0]
-    endif else if min_type eq 'mpfit' then begin
-        r=mpfit('rvfit', guess, bestnorm=chi2, ftol=ftol, /quiet)
-    endif
-
-
- ;   !p.multi=0
-
+        if iter eq 0 then stellar_template_over=replicate(1d0, n_elements(wl_soln_over_full)) $
+        else begin
+            stellar_template_over=interpol(template_residuals, wl_soln_full, wl_soln_over_full)
+            ;snorm=continuum_fit(wl_soln_over_full, stellar_template_over, low_rej=low_reject, high_rej=high_reject)
+            ;stellar_template_over=stellar_template_over/snorm
+        endelse
+        
+        if min_type eq 'amoeba' then begin
+            r=amoeba3(ftol, scale=scale, p0=guess,function_name='rvfit', $
+                      function_value=fval, nmax=150000L)
+            chi2=fval[0]
+        endif else if min_type eq 'mpfit' then begin
+            r=mpfit('rvfit', guess, parinfo=parinfo, bestnorm=chi2, ftol=ftol, /quiet)
+        endif
+        
+        
+        ;   !p.multi=0
+        
 ;stop clock
-    process_time=toc(clock)
-
-
-
-if iter eq 0 then template_residuals=replicate(1d0, n_elements(wl_soln_full))
-if iter lt 8 then begin 
-    template_residuals_dim=template_residuals[first_pix:first_pix+npix_select-1]
-    template_residuals_dim=template_residuals_dim+res
-    template_residuals[first_pix:first_pix+npix_select-1]=template_residuals_dim
-endif
-
+        process_time=toc(clock)
+        
+        
+        
+        if iter eq 0 then template_residuals=replicate(1d0, n_elements(wl_soln_full))
+        if iter lt 8 then begin 
+            template_residuals_dim=template_residuals[first_pix:first_pix+npix_select-1]
+            template_residuals_dim=template_residuals_dim+(res/2d0)
+            ;tnorm=continuum_fit(wl_soln[first_pix:first_pix+npix_select-1],
+            ;template_residuals_dim, low_rej=low_reject, high_rej=high_reject)
+            ;tnorm=max(template_residuals_dim[npix_trim_start:-1*(npix_trim_end+1)])
+            ;template_residuals_dim=template_residuals_dim/tnorm
+            template_residuals[first_pix:first_pix+npix_select-1]=template_residuals_dim
+        endif
+        
+        
+    endfor 
+    
+; openw, tlun, 'template.dat', /get_lun
+; for line=0, n_elements(stellar_template_over)-1 do begin
+;     printf, tlun, wl_soln_over_full[line], stellar_template_over[line]
+; endfor
+; close, tlun
+; free_lun, tlun
+    
 ;stop
-endfor 
-
-openw, tlun, 'template.dat', /get_lun
-for line=0, n_elements(stellar_template_over)-1 do begin
-    printf, tlun, wl_soln_over[line], stellar_template_over[line]
-endfor
-close, tlun
-free_lun, tlun
-
-stop
-
+    
 ;OUTPUT RESULTS
-
-model_id=strjoin([object, epoch,'AB'+strtrim(visit,2), strtrim(first_pix,2), strtrim(first_pix+npix_select-1,2), 'lines'],'_')
-
-if n_elements(r) eq 1 then begin
-    print, "Minimization scheme failed to converge"
-    result_vec=last_guess
-    rvfinal=last_guess[0]
-    chi2=-1
     
-endif else begin
+    model_id=strjoin([object, epoch,'AB'+strtrim(visit,2), strtrim(first_pix,2), strtrim(first_pix+npix_select-1,2), 'Jun28allexp'],'_')
+    
+    if n_elements(r) eq 1 then begin
+        print, "Minimization scheme failed to converge"
+        result_vec=last_guess
+        rvfinal=last_guess[0]
+        chi2=-1
+        
+    endif else begin
+        
+        print, "---------------------------------"
+        print, "Model ID: ", model_id
+        print, "---------------------------------"
+        
+        print, chi2
+        
+        result_vec=r
+        rvfinal=r[0]
+    endelse
     
     print, "---------------------------------"
-    print, "Model ID: ", model_id
-    print, "---------------------------------"
+    print, "Processing took ", process_time, " seconds."
     
-    print, chi2
     
-    result_vec=r
-    rvfinal=r[0]
-endelse
-
-print, "---------------------------------"
-print, "Processing took ", process_time, " seconds."
-
-
-
-outfile=model_id+".fits"
-
-outfinal=outputpath+outfile
-
-if file_test(outfinal) then begin
-    fits_info, outfinal, n_ext=prev_ext, /silent
-    extension=prev_ext+1
-endif else extension=1
-
-
-output_str={OBJ:object, $
-            EPOCH:epoch, $
-            TRACE:trace, $
-            CALIB_FILE:calib_file, $
-            CALIB_EXT:calib_ext, $
-            WL_COEFF:wl_coeff, $
-            GH0_COEFF:gh_coeff_out, $
-            GH1_COEFF:gh_lin_coeff_out, $
-            OTHER_COEFF:other, $
-            OVERSAMP:oversamp, $
-            FTOL:ftol, $
-            NPIX_TRIM_START:npix_trim_start, $
-            NPIX_TRIM_END:npix_trim_end, $
-            FIRST_PIX:first_pix, $
-            NPIX_SELECT:npix_select, $
-            TIME:process_time, $
-            MIN_TYPE:min_type, $
-            EXT:extension, $
-            CHI2:chi2, $
-            MJD:mjd, $
-            DELTA_RV:rvfinal, $
-            RESULT_VEC:result_vec $
-           }
-
-stop
-mwrfits, output_str, outfinal
- 
-
+    
+    outfile=model_id+".fits"
+    
+    outfinal=outpath+outfile
+    
+    if file_test(outfinal) then begin
+        fits_info, outfinal, n_ext=prev_ext, /silent
+        extension=prev_ext+1
+    endif else extension=1
+    
+    
+    output_str={OBJ:object, $
+                EPOCH:epoch, $
+                TRACE:trace, $
+                CALIB_FILE:calib_file, $
+                CALIB_EXT:calib_ext, $
+                WL_COEFF:wl_coeff, $
+                GH0_COEFF:gh_coeff_out, $
+                GH1_COEFF:gh_lin_coeff_out, $
+                OTHER_COEFF:other, $
+                OVERSAMP:oversamp, $
+                FTOL:ftol, $
+                NPIX_TRIM_START:npix_trim_start, $
+                NPIX_TRIM_END:npix_trim_end, $
+                FIRST_PIX:first_pix, $
+                NPIX_SELECT:npix_select, $
+                TIME:process_time, $
+                MIN_TYPE:min_type, $
+                EXT:extension, $
+                CHI2:chi2, $
+                MJD:mjd, $
+                DELTA_RV:rvfinal, $
+                TEMPLATE:stellar_template_over, $
+                RESULT_VEC:result_vec $
+               }
+    
+;stop
+    mwrfits, output_str, outfinal
+    
+    
 endfor
 
 end

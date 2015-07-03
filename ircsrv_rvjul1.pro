@@ -1,6 +1,9 @@
 function rvmodel, p, fakekey=fakekey
 
-common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npix, int_lab, wl_lab, template, wl_template, oversamp, npix_select, first_pix, observation, err, mode, visit, last_guess, visualize,wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index, param_m, param_b,ghga_coeff_index, otherga_index
+common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npix, int_lab, wl_lab, template, wl_template, oversamp, npix_select, first_pix, observation, err, mode, visit1, last_guess, visualize,wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index, param_m, param_b,ghga_coeff_index, otherga_index
+
+visit=visit1
+
 
 ;Record parameters for posterity
 last_guess=p
@@ -209,10 +212,11 @@ endif
 
 
 print, chi2, chi2_nopen
-print, "D_WL: [" + strtrim(wl_start,2) + ", " + strtrim(delta_wl_coeff,2) + "]" 
-print, "SIGMA: [" + strtrim(sig_start,2) + ", " + strtrim(gh0_coeff[0],2) + "]" 
+print, p_scaled
+;print, "D_WL: [" + strtrim(wl_start,2) + ", " + strtrim(delta_wl_coeff,2) + "]" 
+;print, "SIGMA: [" + strtrim(sig_start,2) + ", " + strtrim(gh0_coeff[0],2) + "]" 
 
-print, "RV shift: ["+strtrim(delta_rv,2) + ", " + strtrim(delta_rv+delta_bcv,2) +"] "
+;print, "RV shift: ["+strtrim(delta_rv,2) + ", " + strtrim(delta_rv+delta_bcv,2) +"] "
 print, "----------"
 
 case mode of
@@ -301,7 +305,7 @@ end
 
 
 
-pro ircsrv_ga, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, mode=mode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num, n_lsf_ga=n_lsf_ga, _extra=ex
+pro ircsrv_rvjul1, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, fmode=fmode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num, n_lsf_ga=n_lsf_ga, output_file=output_file, visit=visit, model_tag=model_tag
 
 npix=1024L
 
@@ -313,11 +317,12 @@ if n_elements(object) eq 0 then object='GJ273'
 if n_elements(trace) eq 0 then trace='AB'
 
 
+
 if n_elements(visualize) eq 0 then visualize=1
 ;Define keywords for fitting just a range
 if n_elements(first_pix) eq 0 then first_pix=0
 if n_elements(npix_select) eq 0 then npix_select=128L;npix_select=npix-first_pix
-if n_elements(mode) eq 0 then mode='ga'
+if n_elements(fmode) eq 0 then fmode='mpfit'
 
 
 ;set file paths
@@ -355,7 +360,8 @@ if n_elements(s_iter) eq 0 then s_iter=0
 
 initial_tag='sign' ;Tag for reading in guesses for very first run
 ;current_tag='Mar16bigpen' ;Tag for marking files in this set of iterations
-if n_elements(current_tag) eq 0 then current_tag='Mar17'
+;if n_elements(current_tag) eq 0 then current_tag='Mar17'
+if n_elements(current_tag) eq 0 then current_tag=strjoin((strsplit(systime(),' ',/extract))[1:2])+'temporary'
 
 	;Setting up filenames and paths (basically not tuned)
 	model_id_base=strjoin([object, epoch,'AB', strtrim(first_pix,2), strtrim(first_pix+npix_select-1,2)], '_')
@@ -363,7 +369,7 @@ if n_elements(current_tag) eq 0 then current_tag='Mar17'
         file_base=rvshift1outpath + model_id_base
 
 ;Controls RV guess: 0 - Start with just bcv-based guess, 1 - Read in guess from result of previous run
-s_iter=1
+
 if run eq 0 and s_iter eq 0 then rv_read=0 else rv_read=1
 
 ;Which input file
@@ -375,13 +381,18 @@ if run eq 0 and s_iter eq 0 then begin
 ;'GJ273_18Jan2011_AB_0_127_Mar16bigpen_r0.fits'
     if n_elements(initial_file) ne 0 then input_file=initial_file
 endif else begin
-    input_file=strjoin([file_base, current_tag, 'r'+strtrim(n_run-1,2)], '_') + '.fits'
+    ;    input_file=strjoin([file_base, current_tag,
+    ;    'r'+strtrim(n_run-1,2)], '_') + '.fits'
+    input_file=strjoin([file_base, current_tag, 'mpfit'], '_') + '.fits'
     if n_elements(initial_file) ne 0 then input_file=initial_file
 endelse
 
 ;Output file
 ;output_file=strjoin([file_base, current_tag, 'r'+strtrim(n_run,2)], '_') + '.fits'
-output_file=strjoin([file_base, current_tag, 'mpfit'], '_') + '.fits'
+if n_elements(output_file) eq 0 then begin
+    if run eq 0 then output_file=strjoin([file_base, current_tag, 'mpfit'], '_') + '.fits' $
+    else output_file=strjoin([file_base, current_tag, 'mpfit2'], '_') + '.fits' 
+endif
 
 ;Stellar Template
 ;s_template=s_iter ;Controls which stellar template to use (0 for
@@ -389,11 +400,11 @@ output_file=strjoin([file_base, current_tag, 'mpfit'], '_') + '.fits'
 if n_elements(s_template_num) eq 0 then s_template_num=0L
 
 
-if mode eq 'one_call' then begin ;This allows us to call one_call on a run without switching the I/O tags
+if fmode eq 'one_call' then begin ;This allows us to call one_call on a run without switching the I/O tags
     oc_output_file=output_file+'_spec.fits'
 endif
 
-telluric_option=0 ;0-original model, 1-telluric_test model, 2-h2o_test model
+telluric_option=3 ;0-original model, 1-telluric_test model, 2-h2o_test model 3-tapas model
 
 if n_elements(n_bases_lsf) eq 0 then n_bases_lsf=2L
 
@@ -489,13 +500,16 @@ calib_ext=13
 model_file=rootpath+'epoch/18Jan2011/calib_results/'+calib_file
 model_par=mrdfits(model_file, calib_ext)
 
-common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npixels, int_lab, wl_lab, template_over, temp_wl_over, oversamp, npixselect, firstpix, int_obs, err, fmode, visit, last_guess, visual, wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index, param_m, param_b, ghga_coeff_index, otherga_index
+common modelinfo, delta_rv_index, h2o_depth_index, co2ch4_depth_index, delta_wl_index, gh0_coeff_index, gh1_coeff_index, other_index, lin_switch, wl_telluric, h2o, co2ch4, npixels, int_lab, wl_lab, template_over, temp_wl_over, oversamp, npixselect, firstpix, int_obs, err, ffmode, visit1, last_guess, visual, wl_soln, wl_soln_select, wl_soln_over, wl_soln_over_select, x, xx, x_select, xx_select, bcv, delta_bcv, parscale_all, wl_start, wl_index, sig_start, rv_index, param_m, param_b, ghga_coeff_index, otherga_index
+
+visit1=visit
+
 
 npixels=1024L
 visual=visualize
 npixselect=npix_select
 firstpix=first_pix
-fmode=mode
+ffmode=fmode
 
 ;Assume lin_switch is off
 lin_switch=0
@@ -565,6 +579,83 @@ if s_template_num eq 0 then begin
     free_lun, lun
     
     ;stop
+endif else if s_template_num eq 1 then begin
+    templatefile=templatepath+object+'_template_tapas.dat'
+    readcol, templatefile, temp_wl, temp_spec, format='D,D'
+    if n_elements(temp_wl) ne 7L*npix then message, "You were wrong about the old template sampling"
+    if n_elements(temp_spec) ne 7L*npix then message, "You were wrong about the old template sampling"
+    temp_oversamp=7L
+    
+    
+endif else if s_template_num eq 2 then begin
+    templatefile=templatepath+object+'_template_tapas2.dat'
+    readcol, templatefile, temp_wl, temp_spec, format='D,D'
+    if n_elements(temp_wl) ne 7L*npix then message, "You were wrong about the old template sampling"
+    if n_elements(temp_spec) ne 7L*npix then message, "You were wrong about the old template sampling"
+    temp_oversamp=7L
+    ;norm_start=(10*temp_oversamp) > (first_pix*temp_oversamp)
+    ;norm_end= (first_pix*temp_oversamp + npix_select*temp_oversamp - 1) < ((npix-10)*temp_oversamp-1)
+    ;tempnorm=(max(temp_spec[norm_start:norm_end]))
+    ;temp_spec=temp_spec/tempnorm
+ 
+
+endif else if s_template_num eq 3 then begin
+    templatefile=templatepath+object+'_template_tapas_amoeba.dat'
+    readcol, templatefile, temp_wl, temp_spec, format='D,D'
+    if n_elements(temp_wl) ne 7L*npix then message, "You were wrong about the old template sampling"
+    if n_elements(temp_spec) ne 7L*npix then message, "You were wrong about the old template sampling"
+    temp_oversamp=7L
+    ;norm_start=(10*temp_oversamp) > (first_pix*temp_oversamp)
+    ;norm_end= (first_pix*temp_oversamp + npix_select*temp_oversamp - 1) < ((npix-10)*temp_oversamp-1)
+    ;tempnorm=(max(temp_spec[norm_start:norm_end]))
+    ;temp_spec=temp_spec/tempnorm
+
+endif else if s_template_num eq 4 then begin
+    templatefile='../data/epoch/18Jan2011/temp_results/template_avg.fits'
+    ttt=mrdfits(templatefile, 1)
+	temp_wl=ttt.wl_soln
+        temp_spec=ttt.temp_mean
+    temp_oversamp=7L
+    ;norm_start=(10*temp_oversamp) > (first_pix*temp_oversamp)
+    ;norm_end= (first_pix*temp_oversamp + npix_select*temp_oversamp - 1) < ((npix-10)*temp_oversamp-1)
+    ;tempnorm=(max(temp_spec[norm_start:norm_end]))
+    ;temp_spec=temp_spec/tempnorm
+endif else if s_template_num eq 5 then begin
+    templatefile='../data/epoch/18Jan2011/temp_results/template_avg_smooth.fits'
+    ttt=mrdfits(templatefile, 1)
+	temp_wl=ttt.wl_soln
+        temp_spec=ttt.temp_mean
+    temp_oversamp=7L
+
+endif else if s_template_num eq 6 then begin
+    templatefile='../data/epoch/18Jan2011/temp_results/phoenix_template.fits'
+    ttt=mrdfits(templatefile, 1)
+	temp_wl=ttt.wl_soln
+        temp_spec=ttt.template
+    temp_oversamp=7L
+
+endif else if s_template_num eq 7 then begin
+    templatefile='../data/epoch/18Jan2011/temp_results/template_Jun30phoenixsmooth.fits'
+    ttt=mrdfits(templatefile, 1)
+	temp_wl=ttt.wl_soln
+        temp_spec=ttt.temp_mean
+    temp_oversamp=7L
+
+endif else if s_template_num eq 8 then begin
+    templatefile='../data/epoch/18Jan2011/temp_results/template_Jun30phoenixnotsmooth.fits'
+    ttt=mrdfits(templatefile, 1)
+	temp_wl=ttt.wl_soln
+        temp_spec=ttt.temp_mean
+    temp_oversamp=7L
+
+endif else if s_template_num eq 9 then begin
+    templatefile='../data/epoch/18Jan2011/temp_results/template_'+model_tag+'.fits'
+    ttt=mrdfits(templatefile, 1)
+	temp_wl=ttt.wl_soln
+        temp_spec=ttt.temp_mean
+    temp_oversamp=7L
+
+
 endif else begin
     ;templatefile='/home/stgilhool/RV_projects/IRCS_rv/data/smooth_penalty_test/test16/penaltytest.fits'
     ;temp_ext=30 ;THIS IS THE OLD 3x OVERSAMP TEMPLATE
@@ -636,6 +727,25 @@ case telluric_option of
         wl_telluric=tellstr.wl_telluric        
     end
 
+    3: begin ;This is the tapas model
+        h2ostr=mrdfits(modelpath+'tapas_h2ovac.fits',1)
+        co2ch4str=mrdfits(modelpath+'tapas_co2ch4vac.fits', 1)
+
+        
+        wl_telluric_long=h2ostr.wavelength/1000d0
+        wl_telluric_long=reverse(wl_telluric_long)
+
+        h2o_long=h2ostr.transmittance
+        h2o_long=reverse(h2o_long)
+        co2ch4_long=co2ch4str.transmittance
+        co2ch4_long=reverse(co2ch4_long)
+        
+        m24index=where(wl_telluric_long gt 2.275 and wl_telluric_long lt 2.365)
+        wl_telluric=wl_telluric_long[m24index]
+        h2o=h2o_long[m24index]
+        co2ch4=co2ch4_long[m24index]
+    end
+
 endcase
 ;;;-----Finished reading in smoothed telluric
 
@@ -652,8 +762,8 @@ if visualize eq 1 then window, 0, xsize=1500, ysize=1000
 !p.multi=[0,1,5]
 
 
-;for visit=0, n_ABobj-1 do begin
-for visit=0,0 do begin
+;for visit=1, n_ABobj-1 do begin
+;for visit=0,0 do begin
 
     ;get spectrum for given visit
     int_obs=ABspec_arr[visit,*]
@@ -736,19 +846,23 @@ for visit=0,0 do begin
       norm_index=other_index[1:*]
     nparam_total=other_index[-1]+1
     
-stop
+
     if file_test(input_file) then begin    
-        str=mrdfits(input_file, visit+1)
-        if rv_read eq 0 then rv_guess=[-1d0*delta_bcv] else rv_guess=str.delta_rv
-        n_bases_lsf_in=n_elements(str.gh0_coeff_index)
+        rv_guess=[-1d0*delta_bcv]
+str=mrdfits(input_file, 1);visit+1)
+        ;if rv_read eq 0 then rv_guess=[-1d0*delta_bcv] else rv_guess=str.delta_rv
+        ;n_bases_lsf_in=n_elements(str.gh0_coeff_index)
         gh0_guess=str.result[str.gh0_coeff_index]
 	sig_start=gh0_guess[0]
+        gh0_guess=[gh0_guess, 0d0]
+        
         h2o_depth_guess=str.result[str.h2o_depth_index]
         co2ch4_depth_guess=str.result[str.co2ch4_depth_index]
         wl_start=str.result[3]
 	
-        other_guess_all=str.result[str.other_index]
-        other_guess=other_guess_all[0:n_other-1]
+        other_guess=replicate(1d0, n_other)
+;        other_guess_all=str.result[str.other_index]
+;        other_guess=other_guess_all[0:n_other-1]
     endif else begin
         print, "File doesn't exist"
         openw, lun, '/home/stgilhool/RV_projects/IRCS_rv/data/rvshift1_results/errors.dat', /append, /get_lun
@@ -761,17 +875,23 @@ stop
         other_guess=other_guess_all[0:n_other-1]
     endelse
         
-stop
+
                                 ;; SCALE THE PARAMETERS TO BE OF SAMEISH ORDER
        
-    if ex.ga_stop eq 0 then begin    
-    ;Readin best wl and sig from before
-    readcol, 'startingparams.txt', wl_best_list, sig_best_start, chibest, rv_best_list, format='(D,D,D,D)'
-    sig_start=sig_best_start[visit]
-    wl_start=wl_best_list[visit]
-       endif 
-
-    
+    ;if ex.ga_stop ne !null then begin
+;
+;        if ex.ga_stop eq 0 then begin    
+;            ;Readin best wl and sig from before
+;            readcol, 'startingparams.txt', wl_best_list, sig_best_start, chibest, rv_best_list, format='(D,D,D,D)'
+;            sig_start=sig_best_start[visit]
+;            wl_start=wl_best_list[visit]
+;       endif 
+;   endif else begin
+;       ;Readin best wl and sig from before
+;       readcol, 'startingparams.txt', wl_best_list, sig_best_start, chibest, rv_best_list, format='(D,D,D,D)'
+;       sig_start=sig_best_start[visit]
+;       wl_start=wl_best_list[visit]
+;   endelse
             
                        
             ;Define mpfit constraints
@@ -789,7 +909,7 @@ stop
             parinfo[delta_rv_index].value = rv_guess[0]
             
             ;Step
-            parinfo[delta_rv_index].step = 1d-5 ;Step size is 0.01m/s
+            parinfo[delta_rv_index].step = 1d-3 ;Step size is 1m/s
             
             ;Contraints
             if run eq 1 or s_iter eq 1 then begin
@@ -812,20 +932,24 @@ stop
             co2ch4_depth_parscale=1d0
 
             ;Values
-            parinfo[h2o_depth_index].value = h2o_depth_guess
+            parinfo[h2o_depth_index].value = 0.3d0;h2o_depth_guess
             parinfo[co2ch4_depth_index].value = co2ch4_depth_guess
             
             ;Step
-            parinfo[h2o_depth_index].relstep = 1d-2
-            parinfo[co2ch4_depth_index].relstep = 1d-2
+            parinfo[h2o_depth_index].step = 1d-1
+            parinfo[co2ch4_depth_index].step = 1d-2
             
             ;Constraints
+            parinfo[h2o_depth_index].mpside = 2
+            parinfo[co2ch4_depth_index].mpside = 0
+
             parinfo[h2o_depth_index].limited=[1,1]
             parinfo[co2ch4_depth_index].limited=[1,1]
             
             parinfo[h2o_depth_index].limits=[0d0,1d0]
             parinfo[co2ch4_depth_index].limits=[0d0,1d0]
             
+
             
   ;;; --- DELTA WL ---
             ;Name
@@ -893,7 +1017,7 @@ stop
             
             ;Step
             parinfo[other_index].relstep = 1d-3
-            
+ 
             ;Constraints
             parinfo[other_index].limited=[1,1]
             parinfo[other_index].limits=[0,1.5]
@@ -913,6 +1037,18 @@ stop
     
             guess=parinfo.value
             scale=[rv_scale, h2o_depth_scale, co2ch4_depth_scale, delta_wl_scale, gh0_scale, other_scale]
+            if ffmode eq 'amoeba' then begin
+                ;guess[0:2]=[0d0, 0.5d0, 0.5d0]
+                ;guess[-3:-1]=[0.9d0,1d0,1d0]
+                ;scale[0:2]=[0.4d0, 0.5d0, 0.5d0]
+                ;scale[-3:-1]=[0.1d0, 0.1d0, 0.1d0]
+                other_guess=replicate(1d0, n_other)
+                other_guess[0]=0.9d0
+                other_scale=replicate(0.1d0, n_other)
+                guess=[rv_guess,0.5d0,0.5d0,1d-6,1.5d0,other_guess]
+                scale=[0.4d0,0.5d0,0.5d0,1d-5,1d0,other_scale]
+                parscale=replicate(1d0, n_elements(guess))
+            endif
             
             ;scale=scale*parscale_all
         
@@ -980,13 +1116,12 @@ stop
 ;;;Run Minimization scheme
             
             
-            if fmode eq 'amoeba' then begin
+            if ffmode eq 'amoeba' then begin
                 r=amoeba3(ftol, scale=scale, p0=guess,function_name='rvmodel', $
                           function_value=fval, nmax=150000L)
                 chi2=fval[0]
-            endif else if fmode eq 'mpfit' then begin
-                r=mpfit('rvmodel', bestnorm=chi2, ftol=ftol, parinfo=parinfo, status=status, /quiet)
-                fmode='one_call'
+                status=-222
+                ffmode='one_call'
                 ;print, "R before onecall: ", r
                 ocstr=rvmodel(r)
                 lsf_temp=ocstr.lsf
@@ -997,21 +1132,35 @@ stop
                 err_select=ocstr.error
                 chi2_nopen=total(((model_select-obs_select)/err_select)^2, /double)
                 ;print, "R after oncecall: ", r
-                fmode='mpfit'
-            endif else if fmode eq 'tnmin' then begin
+                ffmode='amoeba'
+            endif else if ffmode eq 'mpfit' then begin
+                r=mpfit('rvmodel', bestnorm=chi2, ftol=ftol, parinfo=parinfo, status=status, /quiet)
+                ffmode='one_call'
+                ;print, "R before onecall: ", r
+                ocstr=rvmodel(r)
+                lsf_temp=ocstr.lsf
+                lsf=lsf_temp[*,0]
+                wl_grid=ocstr.wl_grid
+                model_select=ocstr.model
+                obs_select=ocstr.obs
+                err_select=ocstr.error
+                chi2_nopen=total(((model_select-obs_select)/err_select)^2, /double)
+                ;print, "R after oncecall: ", r
+                ffmode='mpfit'
+            endif else if ffmode eq 'tnmin' then begin
                 ;r=tnmin('rvmodel', guess, autoderivative=1, bestmin=chi2,
                 ;parinfo=parinfo, status=status, /quiet)
                 r=tnmin('rvmodel',  autoderivative=1, bestmin=chi2, parinfo=parinfo, status=status, /quiet)
-            endif else if fmode eq 'one_call' then begin
-                fmode='mpfit'
+            endif else if ffmode eq 'one_call' then begin
+                ffmode='mpfit'
                 chi1_vec=rvmodel(guess)
                 chi2=total(chi1_vec^2, /double)
                 r=last_guess
-                fmode='one_call'
+                ffmode='one_call'
                 ocstr=rvmodel(guess)
                 status=-111
                 ;if visit eq 5 or visit eq 6 or visit eq 7 then stop
-            endif else if fmode eq 'ga' then break
+            endif ;else if ffmode eq 'ga' then break
             
             
             
@@ -1083,7 +1232,7 @@ stop
                         FIRST_PIX:first_pix, $
                         NPIX_SELECT:npix_select, $
                         TIME:process_time, $
-                        MODE:fmode, $
+                        FMODE:ffmode, $
                         CHI2:chi2, $
                         CHI2_NOPEN:chi2_nopen, $
                         WL_GRID:wl_grid, $
@@ -1106,213 +1255,7 @@ stop
                        }
             
             
+    if ffmode ne 'one_call' then mwrfits, output_str, output_file
 
-    if fmode ne 'one_call' then mwrfits, output_str, output_file
-
-endfor
-
-;for visit=1, n_ABobj-1 do begin
-for visit=0, 0 do begin
-    if ex.ga_stop eq 1 then break 
-    fmode='ga'
-                                ;;READ IN MPFIT RUN RESULTS
-    input_str=mrdfits(output_file, visit+1)
-    guess=input_str.result
-    
-    if n_elements(n_lsf_ga) eq 0 then n_lsf_ga=4 ;MAKE KEYWORD
-    gh0_coeff_index=input_str.gh0_coeff_index
-    n_lsf_diff=n_lsf_ga-n_elements(gh0_coeff_index)
-    n_other=n_elements(input_str.other_index)
-    
-    ga_guess=dblarr(n_elements(guess)+n_lsf_diff)
-    ga_guess[0:gh0_coeff_index[0]]=guess[0:gh0_coeff_index[0]]
-    if n_lsf_diff ge 1 then begin
-        ga_guess[gh0_coeff_index[0]+1:gh0_coeff_index[0]+n_lsf_diff]=replicate(0.5d0, n_lsf_diff)
-        ga_guess[gh0_coeff_index[0]+n_lsf_diff+1:*]=guess[gh0_coeff_index[0]+1:*]
-    
-;        help, guess
-;        print, guess
-;        help, ga_guess
-;        print, ga_guess
-;        stop
-        
-        
-        ghga_coeff_index=lindgen(n_lsf_ga)+gh0_coeff_index[0]
-        help, gh0_coeff_index
-        print, gh0_coeff_index
-        
-        otherga_index=lindgen(n_other)+ ghga_coeff_index[-1]+1
-        help, otherga_index
-        print, otherga_index
-        
-    endif else begin
-        ga_guess=guess
-        ghga_coeff_index=gh0_coeff_index
-        otherga_index=other_index
-    endelse
-    
-    ndim=n_elements(ga_guess)
-;    help, ndim
-;    print, ndim
-
-
-
-;save and rename old common block variables
-parscale_all_save=parscale_all
-parscale_all=replicate(1d0, ndim)
-gh0_coeff_index_save=gh0_coeff_index
-gh0_coeff_index=ghga_coeff_index
-other_index_save=other_index
-other_index=otherga_index
-
-    ;;SCALE SO THAT THE PARAMETERS ARE have limits at 0 and 1
-    
-
-  ;;; --- DELTA_RV ---
-            
-            ;Scaling
-            delta_rv_m=0.8d0
-            delta_rv_b=ga_guess[delta_rv_index]-(delta_rv_m/2d0)
-            
-            
-  ;;; --- TELLURIC ---
-            
-            ;Scaling
-
-            h2o_m=0.01d0
-            co2ch4_m=0.01d0
-            h2o_b=ga_guess[h2o_depth_index]-(h2o_m/2d0)
-            co2ch4_b=ga_guess[co2ch4_depth_index]-(co2ch4_m/2d0)
-            
-            
-  ;;; --- DELTA WL ---
-            
-            ;Scaling
-            delta_wl_m=2d-5
-            delta_wl_b=ga_guess[delta_wl_index]-(delta_wl_m/2d0)
-            
-  ;;; --- GH0 ---
-
-            ;Scaling
-            sig_m=0.1d0
-            sig_b=ga_guess[ghga_coeff_index[0]]-(sig_m/2d0)
-            gh0_m=replicate(1d0, n_lsf_diff)
-            gh0_b=replicate(-0.5d0, n_lsf_diff)
-            
-  ;;; --- OTHER ---
-            
-            ;Scaling
-            nh3_m=0.01d0
-            nh3_b=ga_guess[otherga_index[0]]-(nh3_m/2d0)
-            other_m=replicate(0.02d0, n_other-1)
-            other_b=ga_guess[otherga_index[1:*]]-(other_m/2d0)
-
-  ;;; --- ALL TOGETHER NOW ---
-
-            param_m=[delta_rv_m, $
-                     h2o_m, $
-                     co2ch4_m, $
-                     delta_wl_m, $
-                     sig_m, $
-                     gh0_m, $
-                     nh3_m, $
-                     other_m $
-                     ]
-            
-            param_b=[delta_rv_b, $
-                     h2o_b, $
-                     co2ch4_b, $
-                     delta_wl_b, $
-                     sig_b, $
-                     gh0_b, $
-                     nh3_b, $
-                     other_b $
-                     ]
-            
-            lim=rebin([0,1], 2, ndim)
-            fitness=0d0
-
-            funa={param_m:param_m, param_b:param_b}
-            save_gfit=dblarr(ndim)
-            save_gfit=0d0
-            save_igen=0
-	    save_gbest=0d0
-	    save_time=0d0
-
-            ;sol=solber('ga_model',ndim, npop=npop, funa=funa, lim=lim, ngen_max=ngen_max, gfit_best=fitness, term_flag=0, term_fit=2000L, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen, new_save_gbest=save_gbest, new_save_time=save_time)
-            sol=solber('ga_model',ndim, funa=funa, lim=lim,gfit_best=fitness, term_flag=0, term_fit=-1, plot_flag=1, new_save_gen=save_gen, new_save_gfit=save_gfit, new_save_igen=save_igen, new_save_gbest=save_gbest, new_save_time=save_time, _extra=ex)
-            help, sol
-            print, sol
-
-            real_param=param_m*sol+param_b
-            help, real_param
-            print, real_param
-
-            chi2=fitness
-
-            help, chi2
-            print, chi2
-            print, input_str.chi2
-            print, input_str.result
-
-            npop=ex.npop
-            ngen_max=ex.ngen_max
-            
-            
-            n_top=15L
-            help, save_gen
-            print, reform(save_gen[0,0:n_top-1], n_top)
-            help, save_gfit
-            print, save_gfit[0:n_top-1]
-            help, save_igen
-            print, save_igen[0:n_top-1]
-            help, save_gbest
-            help, save_time
-            print, save_time[-1]
-
-            fmode='one_call'
-            octest=rvmodel(real_param)
-            device, decomposed=1
-            window, 1, xs=700, ys=500
-            plot, octest.lsf[*,0], /xs
-            window, 2, xs=700, ys=500
-            plot, octest.residuals, ps=3, /xs
-            window, 3, xs=700, ys=500
-            plot, octest.obs, ps=6, /xs
-            oplot, octest.model, ps=6, color=200
-
-
-            output_str={raw_result:sol, $
-                        scaled_result:real_param, $
-                        chi2:chi2, $
-                        obs:octest.obs, $
-                        model:octest.model, $
-                        residuals:octest.residuals, $
-                        error:octest.error, $
-                        wl_grid:octest.wl_grid, $
-                        lsf:octest.lsf, $
-			npop:npop, $
-			ngen_max:ngen_max, $
-			save_gen:save_gen, $
-			save_gfit:save_gfit, $
-			save_igen:save_igen, $
-			save_gbest:save_gbest, $
-			save_time:save_time $
-                        }
-
-; fmode='ga'           
-;stop
-            
-            ;if file_test(output_file) then begin
-            ;    fits_info, output_file, n_ext=prev_ext, /silent
-            ;    extension=prev_ext+1
-            ;endif else extension=1
-            output_file_new=strjoin([file_base, current_tag, 'ga'], '_') + '.fits'
-            print, output_file
-            mwrfits, output_str, output_file_new
-            
-        endfor
-   stop     
-!p.multi=0
-
+;endfor
 end

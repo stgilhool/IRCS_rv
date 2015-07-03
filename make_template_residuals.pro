@@ -140,7 +140,7 @@ set_plot, 'x'
 if finalplot eq 1 then begin
     !p.multi=0
     ;Make Postscript
-    set_plot, 'ps
+    set_plot, 'ps'
     device, /encapsulated, filename = 'nessf.eps'
     device, /color, bits=8
     loadct, 12
