@@ -1,4 +1,4 @@
-pro make_1Dspec, epoch, object, mask=mask, no_flats=no_flats
+pro make_1Dspec_jul9, epoch, object, mask=mask, no_flats=no_flats
 
 ;keyword
 if n_elements(no_flats) eq 0 then no_flats=1
@@ -14,18 +14,35 @@ rootpath='/home/stgilhool/RV_projects/IRCS_rv/data/'
 epochpath=rootpath+'epoch/'+epoch+'/'
 objectpath=rootpath+object+'/'+epoch+'/obs/'
 flatpath=rootpath+'cal_files/'+epoch+'/'
-outpath=epochpath+'final_spectra/'
+outpath=objectpath+'final_spectra/'
 
 if file_test(outpath, /directory) eq 0 then file_mkdir, outpath
 
 ;No mask for now, so
 if n_elements(mask) eq 0 then mask=replicate(0, 1024)
 
+;maskf=objectpath+'bpmask.0001.fits'
+;ma=mrdfits(maskf,0)
+;mask=total(ma,2)
+;if n_elements(mask) ne 1024 then message, "summed over wrong dimension in mask"
+;flag=where(mask gt 0, fcount)
+;if fcount gt 0 then mask[flag]=1
+
 ;Start with reading in object frames
-obj_list_file=epochpath+object+'_'+epoch+'_'+'1Dspec.list'
+obj_list_file=objectpath+object+'_'+epoch+'_'+'1Dspec.list'
 
 readcol, obj_list_file, obj_file_nameonly, format='A'
-obj_file=epochpath+obj_file_nameonly
+obj_file=objectpath+obj_file_nameonly
+
+sig_list_file=objectpath+object+'_'+epoch+'_'+'1Dsig.list'
+readcol, sig_list_file, sig_file_nameonly, format='A'
+sig_file=objectpath+sig_file_nameonly
+
+bp_list_file=objectpath+object+'_'+epoch+'_'+'1Dbp.list'
+readcol, bp_list_file, bp_file_nameonly, format='A'
+bp_file=objectpath+bp_file_nameonly
+
+
 n_obj=n_elements(obj_file)
 
 ;Loop through each object file and process it
@@ -39,6 +56,7 @@ for f=0, n_obj-1 do begin
     outstr[1]='1D'
     obj_outfile=outpath+strjoin([strjoin([outstr[0],outstr[1]], '_'),outstr[2]], '.')
     
+    print,'reading objs for file '+strtrim(f,2)
     obj_spec=mrdfits(obj_file[f], 0, obj_head, /dscale)*gain
     obj_spec_1D=total(obj_spec, 2, /double)
 
@@ -48,12 +66,105 @@ for f=0, n_obj-1 do begin
     ;THIS IS CHANGED AS OF JUL8,2015.  READNOISE FOR A GIVEN FRAME IS
     ;GIVEN BY RN/SQRT(NDR)
 
-    obj_var=obj_spec + ((read_noise^2)/ndr) + (exptime*dark_current)
-    obj_var_1D=total(obj_var, 2, /double)
-    obj_err=sqrt(obj_var_1D)
+;     obj_var=obj_spec + ((read_noise^2)/ndr) + (exptime*dark_current)
+;     obj_var_1D=total(obj_var, 2, /double)
+;     obj_err=sqrt(obj_var_1D)
+    print, 'readin err for file '+strtrim(f,2)
+    obj_err_2d=mrdfits(sig_file[f], 0, /dscale)*sqrt(gain)  ;/sqrt(gain) this was to convert wrong sigma
+    var_2d=obj_err_2d^2
+    obj_var=total(var_2d, 2, /double)
+    obj_err=sqrt(obj_var)
+
+
+    ;Mask bp from bpmask
+    print,'reading bpmask for file '+strtrim(f,2)
+    bp_2d=mrdfits(bp_file[f], 0)
+    bp_mask=total(bp_2d,2)
+    mask=bp_mask
+    bp_flag=where(bp_mask gt 0, bpfcount)
+
+    ;CHECK DIMS
+    help, obj_spec
+    help, obj_err_2d
+    help, bp_2d
+
+
+    if bpfcount gt 0 then begin
+        ;mask adjacent pixels NEVERMIND, let's do it after cr masking
+        ; bp_flag_up=bp_flag+1
+;         bp_flag_down=bp_flag-1
+        
+;         bp_flag_cat=[bp_flag, bp_flag_up, bp_flag_down]
+;         bp_flag_cat_sort=bp_flag_cat[sort(bp_flag_cat)]
+;         bp_flag_cat_uniq=bp_flag_cat_sort[uniq(bp_flag_cat_sort)]
+;         bp_flag_all=bp_flag_cat_uniq[where(bp_flag_cat_uniq ge 0 and bp_flag_cat_uniq lt 1024)]
+
+        mask[bp_flag]=1
+    endif
+
+    
+
+
+    
+    ;Mask cosmic rays
+    spec_med=median(obj_spec, dimension=2)
+    spec_mean=mean(obj_spec, dimension=2)
+    spec_var=mean((obj_spec-rebin(spec_mean, n_elements(obj_spec[*,0]), n_elements(obj_spec[0,*])))^2, dimension=2)
+    spec_sig=sqrt(spec_var)
+
+
+
+    nerrtol=3
+    for col=0,n_elements(spec_sig)-1 do begin
+        ;spec_fit_coeff=robust_poly_fit(lindgen(n_elements(obj_spec[0,*])), obj_spec[col,*], 2, spec_fit, fit_sig)
+;        spec_fit_coeff=gaussfit(lindgen(n_elements(obj_spec[0,*]))-(n_elements(obj_spec[0,*)/2), obj_spec[col,*], 2, spec_fit, fit_sig)
+        ;spec_fit=gaussfit(lindgen(n_elements(obj_spec[0,*])),
+        ;obj_spec[col,*], coeff, nterms=4,yerror=yerror)
+        spec_fit=mpfitpeak(lindgen(n_elements(obj_spec[0,*])), obj_spec[col,*], coeff, nterms=4,yerror=yerror, error=obj_err_2d, /lorentzian)
+        err_tol=nerrtol*yerror
+        for row=0,n_elements(obj_spec[0,*])-1 do begin
+;            if abs(obj_spec[col,row]-spec_med[col]) gt spec_sig[col] then begin
+;            if abs(obj_spec[col,row]-spec_fit[col]) gt 3*fit_sig then
+;            begin 
+            
+            ;if f eq 7 then err_tol=3*yerror
+            if abs(spec_fit[row]-obj_spec[col,row]) gt err_tol then begin 
+               plot, obj_spec[col,*], title=strtrim(f,2)+'_'+strtrim(col,2)+', '+strtrim(row,2)
+               oplot, spec_fit, color=200
+                rep=1
+                stop
+                if rep eq 1 then begin
+                    if mask[col] ne 1 then mask[col]=1
+                    xx=lindgen(n_elements(obj_spec[0,*]))
+                    x=xx[where(xx ne row)]
+                    new_spec=obj_spec[col,x]
+                    new_spec_fit=gaussfit(x, new_spec, nterms=4)
+                    newnew_spec_fit=interpol(new_spec_fit, x, xx)
+                    obj_spec_1d[col]=total(newnew_spec_fit)
+                endif
+                
+            endif
+        endfor
+    endfor
+
+    mask_ind=where(mask ne 0, mmcount)
+    if mmcount gt 0 then begin
+        ;mask adjacent pixels to masked ones
+         bp_flag_up=mask_ind+1
+         bp_flag_down=mask_ind-1
+        
+         bp_flag_cat=[bp_flag, bp_flag_up, bp_flag_down]
+         bp_flag_cat_sort=bp_flag_cat[sort(bp_flag_cat)]
+         bp_flag_cat_uniq=bp_flag_cat_sort[uniq(bp_flag_cat_sort)]
+         bp_flag_all=bp_flag_cat_uniq[where(bp_flag_cat_uniq ge 0 and bp_flag_cat_uniq lt 1024)]
+         mask[bp_flag_all]=1
+         ;dial up error in masked pixels
+        obj_err[bp_flag_all]=1d10
+    endif
 
     obj_outstruct={header:obj_head, spectrum:obj_spec_1D, sigma:obj_err, mask:mask}
 
+    print, 'writing structure for file '+strtrim(f,2)
     mwrfits, obj_outstruct, obj_outfile, /create
 
 endfor

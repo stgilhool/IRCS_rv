@@ -4,10 +4,10 @@ if n_elements(make_template) eq 0 then make_template=0
 
 ;if n_elements(model_tag) eq 0 then model_tag=strjoin((strsplit(systime(),' ',/extract))[1:2])+'temporary'
 
-description='Phoenix template, shift per exp, not smooth residuals, avg templates'
+description=''
 
 ;;;EXTRA FOR BOTH
-model_tag='Jul1ptempTAP1'
+model_tag='Jul7kstemp'
 model_out_tag='Jul2ptempTAP1_5mask' ;FOR FITTING ONLY, ACTUALLY
 telluric_option=3 ;0-original telluric 3-TAPAS
 
@@ -17,7 +17,7 @@ lab_depth=0
 norm=0
 temp_file='../data/epoch/18Jan2011/temp_results/phoenix_template.fits'
 chi2_tol=0.05
-smooth_opt=1
+smooth_opt=0
 visualize=0
 
 ;;;EXTRA for q_wrap

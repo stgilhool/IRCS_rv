@@ -99,14 +99,33 @@ end
 
 pro process_flats, gc_on_list, gc_off_list, nc_on_list, nc_off_list
 
+;set file names
+filepath='/home/stgilhool/RV_projects/IRCS_rv/IRCS_flats/'
+maskname='mask1D.fits'
+gc_on_list='gc_on_list.txt'
+gc_off_list='gc_off_list.txt'
+nc_on_list='nc_on_list.txt'
+nc_off_list='nc_off_list.txt'
+
+gc_on_list=filepath+gc_on_list
+gc_off_list=filepath+gc_off_list
+nc_on_list=filepath+nc_on_list
+nc_off_list=filepath+nc_off_list
+maskfile=filepath+maskname
+
 ;read in mask
-mask=mrdfits('mask1D.fits',0,/dscale)
+mask=mrdfits(maskfile,0,/dscale)
 
 ;read in file names
 readcol, gc_on_list, gc_on_file, format='A'
 readcol, gc_off_list, gc_off_file, format='A'
 readcol, nc_on_list, nc_on_file, format='A'
 readcol, nc_off_list, nc_off_file, format='A'
+;add filepath
+gc_on_file=filepath+gc_on_file
+gc_off_file=filepath+gc_off_file
+nc_on_file=filepath+nc_on_file
+nc_off_file=filepath+nc_off_file
 
 ;initialize pointer arrays to store spectra and error data
 nflats=n_elements(gc_on_file)
@@ -132,7 +151,7 @@ read_noise=68d0 ;electrons/NDR
 dark_current=0.05d0 ;electrons/second
 time=0.5 ;seconds
 
-;Read in spectra
+;Read in spectra in number of photo-electrons
 for file=0,nflats-1 do begin
     gc_on_arr[file, *, *]=mrdfits(gc_on_file[file], 0, /dscale)*gain
     gc_off_arr[file, *, *]=mrdfits(gc_off_file[file], 0, /dscale)*gain
@@ -141,7 +160,7 @@ for file=0,nflats-1 do begin
                                
 endfor
 
-;variance at all pixels in each row in each flat
+;variance at all pixels in each pixel in each flat
 gc_on_var=gc_on_arr + (read_noise^2) + (dark_current*time)
 gc_off_var=gc_off_arr + (read_noise^2) + (dark_current*time)
 nc_on_var=nc_on_arr + (read_noise^2) + (dark_current*time)
@@ -149,40 +168,57 @@ nc_off_var=nc_off_arr + (read_noise^2) + (dark_current*time)
 
 ;sum along columns of pixels and take median of the flats to get
 ;single 1D spectra for gc/nc , on/off
-gc_on_med=median(total(gc_on_arr, 3), dimension=1, /double)
-gc_off_med=median(total(gc_off_arr, 3), dimension=1, /double)
-nc_on_med=median(total(nc_on_arr, 3), dimension=1, /double)
-nc_off_med=median(total(nc_off_arr, 3), dimension=1, /double)
+;gc_on_med=median(total(gc_on_arr, 3), dimension=1, /double)
+;gc_off_med=median(total(gc_off_arr, 3), dimension=1, /double)
+;nc_on_med=median(total(nc_on_arr, 3), dimension=1, /double)
+;nc_off_med=median(total(nc_off_arr, 3), dimension=1, /double)
 
+;get the mean in a similar way
+;gc_on_mean=mean(total(gc_on_arr, 3), dimension=1, /double)
+;gc_off_mean=mean(total(gc_off_arr, 3), dimension=1, /double)
+;nc_on_mean=mean(total(nc_on_arr, 3), dimension=1, /double)
+;nc_off_mean=mean(total(nc_off_arr, 3), dimension=1, /double)
+
+;Sum the columns and spectra to get total counts per pixel
+gc_on_tot=total(total(gc_on_arr, 3), 1)
+gc_off_tot=total(total(gc_off_arr, 3), 1)
+nc_on_tot=total(total(nc_on_arr, 3), 1)
+nc_off_tot=total(total(nc_off_arr, 3), 1)
+
+gc_on_tot_var=total(total(gc_on_var, 3),1)
+gc_off_tot_var=total(total(gc_off_var, 3),1)
+nc_on_tot_var=total(total(nc_on_var, 3),1)
+nc_off_tot_var=total(total(nc_off_var, 3),1)
 ;SNR is reduced by the following factor when taking the median
-median_factor=sqrt(!PI/(2*nflats))
+;median_factor=sqrt(!PI/(2*nflats))
 
 ;calculate noise in the various spectra
-gc_on_err=median(sqrt(total(gc_on_var, 3)), dimension=1, /double)*median_factor
-gc_off_err=median(sqrt(total(gc_off_var, 3)), dimension=1, /double)*median_factor
-nc_on_err=median(sqrt(total(nc_on_var, 3)), dimension=1, /double)*median_factor
-nc_off_err=median(sqrt(total(nc_off_var, 3)), dimension=1, /double)*median_factor
+;gc_on_err=median(sqrt(total(gc_on_var, 3)), dimension=1, /double)*median_factor
+;gc_off_err=median(sqrt(total(gc_off_var, 3)), dimension=1, /double)*median_factor
+;nc_on_err=median(sqrt(total(nc_on_var, 3)), dimension=1, /double)*median_factor
+;nc_off_err=median(sqrt(total(nc_off_var, 3)), dimension=1, /double)*median_factor
 
 
 ;Now take on-off
-gc_arr=gc_on_med-gc_off_med
-nc_arr=nc_on_med-nc_off_med
+gc_arr=gc_on_tot-gc_off_tot
+nc_arr=nc_on_tot-nc_off_tot
 ;errors
-gc_err=sqrt((gc_on_err^2)+(gc_off_err^2))
-nc_err=sqrt((nc_on_err^2)+(nc_off_err^2))
-
+;gc_err=sqrt((gc_on_err^2)+(gc_off_err^2))
+;nc_err=sqrt((nc_on_err^2)+(nc_off_err^2))
+gc_arr_var=gc_on_tot_var+gc_off_tot_var
+nc_arr_var=nc_on_tot_var+nc_off_tot_var
 
 ;Finally, do gc/nc
 observed_spectrum=gc_arr/nc_arr
 ;errors
-var_final=(observed_spectrum^2)*(((gc_err/gc_arr)^2)+((nc_err/nc_arr)^2))
+var_final=(observed_spectrum^2)*((gc_arr_var/(gc_arr^2))+(nc_arr_var/(nc_arr^2)))
 error=sqrt(var_final)
 
 out_str={nh3_spec:observed_spectrum,nh3_err:error,nh3_mask:mask}
 outfile='NH3_obs.fits'
 mwrfits, out_str, outfile, /create
 
-;stop
+stop
 
 end
 

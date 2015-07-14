@@ -207,7 +207,7 @@ if (visualize eq 1 ) then begin ;or mode eq 'one_call') then begin
     plot, wl_grid_select, observation_select, yr=[0.3, 1.1], /xs
     oplot, wl_grid_select, model_select, ps=8, color=200, symsize=0.5
 
-    plot, wl_grid_select, residuals, xtitle="Wavelength (microns)", yr=[-0.1, 0.1], ps=3, /xs
+    plot, wl_grid_select, deviation, xtitle="Wavelength (microns)", ps=3, /xs
     
 endif
 
@@ -312,7 +312,7 @@ end
 
 
 
-pro ircsrv_rvjul2, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, fmode=fmode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num, n_lsf_ga=n_lsf_ga, output_file=output_file, visit=visit, model_tag=model_tag
+pro ircsrv_rvjul10, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, fmode=fmode, run=run, n_bases_lsf=n_bases_lsf, n_other=n_other, s_iter=s_iter, current_tag=current_tag, initial_file=initial_file, s_template_num=s_template_num, n_lsf_ga=n_lsf_ga, output_file=output_file, visit=visit, model_tag=model_tag
 
 npix=1024L
 
@@ -684,7 +684,7 @@ endcase
 ;stru=mrdfits(ABobj_file[0], 1)
 ;head1=stru.header
 ;get bcv correction
-bcvcorr_ircs, headers[0], params1
+bcvcorr_ircs, headers[0].head, params1
 ;bcv0=1000d0 * params1[0]
 bcv0=params1[0]
 
@@ -731,7 +731,7 @@ if visualize eq 1 then window, 0, xsize=1500, ysize=1000
 ;    struct=mrdfits(ABobj_file[visit], 1)
  ;   head=struct.header
     ;Get bcv correction
-    bcvcorr_ircs, headers[visit], params
+    bcvcorr_ircs, headers[visit].head, params
     bcv=params[0]
     delta_bcv=bcv-bcv0
     

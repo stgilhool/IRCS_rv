@@ -1,14 +1,14 @@
-pro q_wrap_big, make_template=make_template
+pro q_wrap_big_jul8, make_template=make_template
 
 if n_elements(make_template) eq 0 then make_template=0
 
 ;if n_elements(model_tag) eq 0 then model_tag=strjoin((strsplit(systime(),' ',/extract))[1:2])+'temporary'
 
-description='Phoenix template, shift per exp, not smooth residuals, avg templates'
+description=''
 
 ;;;EXTRA FOR BOTH
-model_tag='Jul1ptempTAP1'
-model_out_tag='Jul2ptempTAP1_5mask' ;FOR FITTING ONLY, ACTUALLY
+model_tag='Jul10ksquicktestsmooth'
+model_out_tag='Jul10ksfit2' ;FOR FITTING ONLY, ACTUALLY
 telluric_option=3 ;0-original telluric 3-TAPAS
 
 ;;;EXTRA for template caller
@@ -16,7 +16,7 @@ min_type='amoeba'
 lab_depth=0
 norm=0
 temp_file='../data/epoch/18Jan2011/temp_results/phoenix_template.fits'
-chi2_tol=0.05
+chi2_tol=0.03
 smooth_opt=1
 visualize=0
 
@@ -27,7 +27,7 @@ n_bases_lsf=1L
 n_other=3L
 s_template_num=9 ;template corresponding to tag
 fmode='amoeba'
-visualize=0
+visualize=1
 
 ;;;KEYWORDS for q_wrap
 first_first_pix=0L
@@ -82,15 +82,15 @@ close, lun
 free_lun, lun
 
 
-if file_test( '../data/epoch/18Jan2011/temp_results/template_'+model_tag+'.fits') eq 0 then message, "Template corresponding to model_tag does not exist.  Check model_tag, or turn on /make_template option"
+if make_template eq 0 and file_test( '../data/epoch/18Jan2011/temp_results/template_'+model_tag+'.fits') eq 0 then message, "Template corresponding to model_tag does not exist.  Check model_tag, or turn on /make_template option"
 
-if make_template then template_caller_jul1, _EXTRA=ex
+if make_template then template_caller_jul8, _EXTRA=ex
 
 
 ;q_wrap_jul1, first_first_pix=first_first_pix, pix_step=pix_step, model_tag_out=model_out_tag, _EXTRA=ex2
 
 
 
-q_wrap_jul2, first_first_pix=first_first_pix, pix_step=pix_step, model_out_tag=model_out_tag, _EXTRA=ex2
+q_wrap_jul10, first_first_pix=first_first_pix, pix_step=pix_step, model_out_tag=model_out_tag, _EXTRA=ex2
 
 end

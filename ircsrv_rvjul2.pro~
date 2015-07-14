@@ -166,6 +166,13 @@ residuals=(observation_select - model_select)
 deviation = residuals/err_select
 ;deviation_squared = deviation^2
 
+;Find maximally deviant pixel
+
+for loop=0,4 do begin
+    abs_dev=deviation^2
+    max_d=max(abs_dev, max_d_ind)
+    deviation[max_d_ind]=0d0
+endfor
 
 chi1_vec=deviation * exp(penalty)
 

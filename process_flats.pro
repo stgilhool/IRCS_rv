@@ -139,7 +139,7 @@ nc_on_arr=dblarr(nflats, nrows, ncols)
 nc_off_arr=dblarr(nflats, nrows, ncols)
 
 gc_on_var=dblarr(nflats, nrows, ncols)
-gc_off_var=dblarr(nflats, nrows, ncols)
+ gc_off_var=dblarr(nflats, nrows, ncols)
 nc_on_var=dblarr(nflats, nrows, ncols)
 nc_off_var=dblarr(nflats, nrows, ncols)
 
@@ -161,6 +161,9 @@ for file=0,nflats-1 do begin
 endfor
 
 ;variance at all pixels in each pixel in each flat
+;THIS CHANGED ON JUL8,2015.  read noise in one frame is 68/sqrt(NDR)
+;NEVERMIND, I DON'T THINK THIS CODE IS EVEN USED ANYMORE, OR MAYBE IT
+;IS, I DON'T KNOW
 gc_on_var=gc_on_arr + (read_noise^2) + (dark_current*time)
 gc_off_var=gc_off_arr + (read_noise^2) + (dark_current*time)
 nc_on_var=nc_on_arr + (read_noise^2) + (dark_current*time)
