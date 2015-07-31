@@ -255,9 +255,6 @@ if n_elements(chi2_tol) eq 0 then chi2_tol=0.07
 if n_elements(smooth_opt) eq 0 then smooth_opt=0
 
 
-;CAUTION: I'm fixing the following variable temporarily
-;npix_select=150L
-
 npix=1024L
 if n_elements(visualize) eq 0 then visualize=0
 ;Define keywords for fitting just a range
@@ -419,90 +416,58 @@ mintype=min_type
 
 
 ;Read in calibration results
-parinfo_all = mrdfits(calib_model, 2)
+calibinfo_all = mrdfits(calib_model, 2)
 
-
-
-used_ind = where(parinfo_all.used eq 1, parcount)
+used_ind = where(calibinfo_all.used eq 1, parcount)
 
 if parcount eq 0 then message, "error reading in calibration results" else begin
     
-    calib_r	= parinfo_all[used].tbestfit
-    pnames  	= parinfo_all[used].parname
-    
-    wli		= where(strmatch(parnames, 'wl[0-4]*') eq 1, n_wl)
-    ghi 	= where(strmatch(pnames, 'gh[0-9]*') eq 1, n_gh)
-    d_ghi 	= where(strmatch(pnames, 'd_gh[0-9]*') eq 1, n_d_gh)
+    calibinfo	= calibinfo_all[used_ind]
+
+    ind_str	= parinfo_getindex(calibinfo, /used)
+
+    calib_r	= calibinfo.tbestfit
+
+    n_wl	= ind_str.n_wl
+    wli		= ind_str.wli
+    n_gh	= ind_str.n_gh
+    ghi		= ind_str.ghi
+    n_d_gh	= ind_str.n_d_gh
+    if n_d_gh gt 0 then begin
+        lin_switch 	= 1
+        d_ghi		= ind_str.d_ghi
+        gh_lin_coeff	= calib_r[d_ghi]
+    endif else begin
+        lin_switch 	= 0
+        gh_lin_coeff	= 0d0
+    endelse
+    n_t		= ind_str.n_t
+    ti		= ind_str.ti
+    n_k		= ind_str.n_k
+    ki		= ind_str.ki
+
     
     wl_coeff	= calib_r[wli]
     gh_coeff	= calib_r[ghi]
-    if n_d_gh gt 0 then gh_lin_coeff	= calib_r[d_ghi]
     
+    sigma	= gh_coeff[0]  
+    tau_scale 	= calib_r[ti]
+    norm_pts 	= calib_r[ki]
 
-
+endelse
 
 ;Turn off finalplot
 finalplot=0
-
-;;;Parameters from amoeba
-wl_coeff=model_par.wl_result
-
-gh_coeff=model_par.gh0_result
-gh_coeff_out=gh_coeff
-sigma=gh_coeff[0]
-;gh_coeff[0]=1d0
-
-
-if lin_switch eq 1 then begin
-    gh_lin_coeff=model_par.gh1_result
-    gh_lin_coeff_out=gh_lin_coeff
-    ;sigma_lin=gh_lin_coeff[0]
-    ;gh_lin_coeff[0]=0d0
-    other=model_par.other_result
-endif else begin
-    ;sigma_lin=0d0
-endelse
-
-tau_scale=other[0]
-if n_elements(other) gt 1 then norm_pts=other[1:n_elements(other)-1]
-
-nparam=model_par.nparam
-nparam_wl=n_elements(wl_coeff)
-nparam_gh=n_elements(gh_coeff)
-nparam_other=n_elements(other)
-nparam_gh1=nparam-nparam_wl-nparam_gh-nparam_other
-
-
-;if n_elements(other) gt 1 then begin
-;    nparam_norm=nparam_other-1
-;    x_x=lindgen(npix_select)+first_pix
-;    x_norm=dblarr(nparam_norm)
-;    x_norm[0]=first_pix
-;    x_norm[nparam_norm-1]=first_pix+npix_select-1
-;    x_increment=npix_select/(nparam_norm-2)
-;    for i=1, nparam_norm-2 do x_norm[i]=x_norm[i-1]+x_increment
-
-;    norm_factor=interpol(norm_pts, x_norm, x_x, /spline)    
-    
-;endif
-;;;
 
 ;Other parameters and constants
 oversamp=model_par.oversamp
 npix_lsf=(oversamp*10L)+1L
 c=299792458.D
 
-;Grab other structure variables just in case
-;npix_trim_start=model_par.npix_trim_start
-;npix_trim_end=model_par.npix_trim_end
 npix_trim_start=5L
 npix_trim_end=5L
 
 npix_model=npix_select*oversamp
-
-
-
-
 
 
 
@@ -522,10 +487,6 @@ if lab_depth eq 0 then int_lab_depth=int_lab^tau_scale
 
 
 ;read in telluric spectrum
-;tell=mrdfits(modelpath+'skytable.fits', 1)
-;tellwl=tell.lam
-;telluric=tell.trans
-
 
 if telluric_option eq 0 then begin
     h2ostr=mrdfits(modelpath+'sky_h2o.fits',1)
@@ -539,10 +500,6 @@ endif else begin
 
     h2ostr=mrdfits(modelpath+'tapas_h2ovac.fits',1)
     co2ch4str=mrdfits(modelpath+'tapas_co2ch4vac.fits', 1)
-
-;    h2ostr=mrdfits(modelpath+'tapas_h2onovac.fits',1)
-;    co2ch4str=mrdfits(modelpath+'tapas_co2ch4novac.fits', 1)
-
 
     tell_wl_long=h2ostr.wavelength/1000d0
     tell_wl_long=reverse(tell_wl_long)
@@ -566,7 +523,6 @@ x=dindgen(npix)
 xx=(dindgen(npix*oversamp)-(oversamp/2))/oversamp
 
 wl_soln=poly(x, wl_coeff)
-;samp_index=(lindgen(npix)*oversamp)+(oversamp/2)
 
 wl_soln_over=poly(xx, wl_coeff)
 
@@ -580,7 +536,6 @@ wl_soln_over_full=wl_soln_over
 
 ;Redefine those vectors to reflect only the specified range
 
-
 x_select=dindgen(npix_select)+first_pix
 xx_select=(dindgen(npix_model)-(oversamp/2))/oversamp+first_pix
 
@@ -589,10 +544,7 @@ samp_index=(lindgen(npix_select)*oversamp)+(oversamp/2)
 wl_soln_over=poly(xx_select, wl_coeff)
 
 
-
-
-
-
+;Eliminate first observation
 n_ABobj=n_ABobj-1
 ABspec_arr=ABspec_arr[1:*,*]
 ABerr_arr=ABerr_arr[1:*,*]
@@ -603,16 +555,13 @@ ABmjd_arr=ABmjd_arr[1:*,*]
 ;Make LSF
 ;;;;
 
-lsf=ircsrv_lsfold(gh_coeff, gh1_vec=gh_lin_coeff, oversamp=oversamp, npix_select=npix_select, first_pix=first_pix, /verbose)
+lsf=ircsrv_lsf(gh_coeff, gh1_vec=gh_lin_coeff, oversamp=oversamp, npix_select=npix_select, first_pix=first_pix, /verbose)
 
 ;Now fit each observation
-;n_obs=n_elements(spectra[0,*])
 
-;for visit=0, n_ABobj-1 do begin
 for visit=0, n_ABobj-1 do begin
     
 ;Define Template
-;temp=ABtemp_rough
     bigc=299792458d0 ;m/s
     
 ;get header
@@ -647,7 +596,7 @@ for visit=0, n_ABobj-1 do begin
     clock=tic()
     
 ;Define inputs to modeling function
-    ftol=1d-11
+    ftol=1d-10
     
     if telluric_option eq 0 then begin
         co2ch4_depth_guess=[0.3d0]
@@ -927,7 +876,7 @@ free_lun, lun1
                 TEMPLATE:best_template, $
                   BEST_ITER:best_iter, $
                   BEST_PROB:best_prob, $
-                RESULT_VEC:result_vec $
+                  RESULT_VEC:result_vec $
                }
     
 ;stop
