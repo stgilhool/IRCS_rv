@@ -1,0 +1,18 @@
+function testfunc, str
+
+str.test1=str.test1+1
+
+return, str
+
+
+pro test
+
+t1=dindgen(10)
+t2=dinggen(5)
+parinfo={test1:t1, test2:t2}
+
+a=testfunc(parinfo)
+
+stop
+
+end
