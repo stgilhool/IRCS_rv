@@ -451,7 +451,7 @@ if parcount eq 0 then message, "error reading in calibration results" else begin
     gh_coeff	= calib_r[ghi]
     
     sigma	= gh_coeff[0]  
-    tau_scale 	= calib_r[ti]
+    tau_scale 	= calib_r[ti[0]]
     norm_pts 	= calib_r[ki]
 
 endelse
@@ -597,6 +597,10 @@ for visit=0, n_ABobj-1 do begin
     
 ;Define inputs to modeling function
     ftol=1d-10
+    
+    if model_input eq 1 then begin
+        model_in	= parinfo_readin(model_input)
+    
     
     if telluric_option eq 0 then begin
         co2ch4_depth_guess=[0.3d0]

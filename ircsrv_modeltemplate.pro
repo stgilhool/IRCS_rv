@@ -47,77 +47,42 @@ obs_noconv=product_model
 ;Convolve model with lsf
 ;;;;
 
-int_conv=dblarr(npix_model)
-int_conv_mtx=dblarr(npix_lsf, npix_model)
-
-
-for index=0,npix_model-1 do begin
-    model_index=index+first_pix*oversamp
-    if model_index lt (npix_lsf/2) or model_index gt (n_elements(obs_noconv)-1-(npix_lsf/2)) then $
-      int_conv_mtx[*,index]=replicate(1d0, npix_lsf) $
-    else int_conv_mtx[*,index]=obs_noconv[model_index-(npix_lsf/2):model_index+(npix_lsf/2)]
-endfor
-int_conv_temp=int_conv_mtx*lsf
-int_conv=total(int_conv_temp, 1, /double)
+int_conv = ircs_convolve(obs_noconv, lsf, oversamp=oversamp, first_pix=first_pix, npix_select=npix_select)
 
 
 ;;;;
 ;Down-sample the model to IRCS resolution
 ;;;;
 
-tophat=replicate(1d0/oversamp,oversamp)
-int_avg=convol(int_conv, tophat)
+stellar_template	= downsample_tophat(stellar_template_over, oversamp)
 
-stellar_template_avg=convol(stellar_template_over, tophat)
+int_model		= downsample_tophat(int_conv, oversamp)
+int_lab_down		= downsample_tophat(int_lab_over_full, oversamp)
+h2o_shift_down		= downsample_tophat(h2o_shift, oversamp)
+co2ch4_shift_down	= downsample_tophat(co2ch4_shift, oversamp)
 
-int_lab_over_avg=convol(int_lab_over_full, tophat)
-samp_index_full=lindgen(n_elements(wl_soln_full))*oversamp+(oversamp/2)
-stellar_template=stellar_template_avg[samp_index_full]
-int_lab_down=int_lab_over_avg[samp_index_full]
-h2o_shift_avg=convol(h2o_shift, tophat)
-h2o_shift_down=h2o_shift_avg[samp_index_full]
-h2o_shift_dim=h2o_shift_down[first_pix:first_pix+npix_select-1]
-co2ch4_shift_avg=convol(co2ch4_shift, tophat)
-co2ch4_shift_down=co2ch4_shift_avg[samp_index_full]
-co2ch4_shift_dim=co2ch4_shift_down[first_pix:first_pix+npix_select-1]
-stellar_template_dim=stellar_template[first_pix:first_pix+npix_select-1]
-int_lab_dim=int_lab_down[first_pix:first_pix+npix_select-1]
+;And take just the selected pixel range
 
+stellar_template_dim	= stellar_template[first_pix:first_pix+npix_select-1]
+int_lab_dim		= int_lab_down[first_pix:first_pix+npix_select-1]
+h2o_shift_dim		= h2o_shift_down[first_pix:first_pix+npix_select-1]
+co2ch4_shift_dim	= co2ch4_shift_down[first_pix:first_pix+npix_select-1]
 
-int_model=int_avg[samp_index] 
 
 
 ;;;;
 ;Correct subtle variations in continuum
 ;;;;
- 
+
 if norm gt 0 then begin    
     
-    ;X vector of same dimensions as ircs-resolution spectrum
-    norm_pts_xx=lindgen(npix_select)+first_pix
-    
-    ;Create and populate vector with x-coord of node pts
-    norm_pts_x=dblarr(nnorm)
-    
-    if nnorm ge 2 then begin
-        norm_pts_x[0]=first_pix
-        norm_pts_x[nnorm-1]=first_pix+npix_select-1
-        if nnorm ge 3 then begin
-            x_increment=npix_select/(nnorm-1)
-            for i=1, nnorm-2 do norm_pts_x[i]=norm_pts_x[i-1]+x_increment
-        endif
-        
-        ;Interpolate between nodes with a spline
-        if npix_select ge 128L and nnorm ge 5 then norm_factor=interpol(norm_pts_y, norm_pts_x, norm_pts_xx, /spline) $
-        else norm_factor=interpol(norm_pts_y, norm_pts_x, norm_pts_xx)
-    endif else if nnorm eq 1 then norm_factor=replicate(norm_pts_y, npix_select) 
-
-int_model=int_model*norm_factor   
+    norm_factor 	= ircsrv_normcorr(norm_pts_y, first_pix=first_pix, $
+                                          npix_select=npix_select)
+ 
+    int_model		= int_model*norm_factor   
 
 endif
     
-
-
 
 
 ;;;;
@@ -286,122 +251,7 @@ outputpath=epochpath+'rv_results/'
 
 if n_elements(calib_model) eq 0 then calib_model=calibpath+'5_2_0_6_best.fits'
 
-;Define flat file names and full path file names
-ABflat_filename=strjoin(['NH3', object, epoch, 'AB1'], '_')+'.fits'
-;BAflat_filename=strjoin(['NH3', object, epoch, 'BA1'], '_')+'.fits'
-ABflat_file=flatpath+strjoin(['NH3', object, epoch, 'AB1'], '_')+'.fits'
-;BAflat_file=flatpath+strjoin(['NH3', object, epoch, 'BA1'], '_')+'.fits'
-
-
-;Define object file names and full path file names
-ABobj_listname=strjoin([object, epoch, 'AB'], '_')+'.list'
-;BAobj_listname=strjoin([object, epoch, 'BA'], '_')+'.list'
-ABobj_list=objectpath+strjoin([object, epoch, 'AB'], '_')+'.list'
-;BAobj_list=objectpath+strjoin([object, epoch, 'BA'], '_')+'.list'
-
-
-;Read in object filenames and then spectra
-readcol, ABobj_list, ABobj_filename, format='A'
-;readcol, BAobj_list, BAobj_filename, format='A'
-
-ABobj_file=objectpath+ABobj_filename
-;BAobj_file=objectpath+BAobj_filename
-
-n_ABobj=n_elements(ABobj_file)
-;n_BAobj=n_elements(BAobj_file)
-
-
-;Initialize arrays of spectra
-temp_str=mrdfits(ABobj_file[0], 1)
-temp_spectrum=temp_str.spectrum
-npix=n_elements(temp_spectrum)
-ABspec_arr=dblarr(n_ABobj, npix)
-;BAspec_arr=dblarr(n_BAobj, npix)
-ABflat_arr=dblarr(n_ABobj, npix)
-;BAflat_arr=dblarr(n_BAobj, npix)
-
-
-ABmjd_arr=dblarr(n_ABobj)
-;BAmjd_arr=dblarr(n_BAobj)
-
-;define error arrays
-ABerr_arr=dblarr(n_ABobj, npix)
-;BAerr_arr=dblarr(n_BAobj, npix)
-
-;Set continuum normalization params
-low_reject=0.53
-high_reject=3.0
-
-
-;Loop through each object file and flip and normalize it
-for f=0, n_ABobj-1 do begin
-    ABobj_spec=mrdfits(ABobj_file[f], 1)
-    ;BAobj_spec=mrdfits(BAobj_file[f], 1)
-
-    ABspec_backwards=ABobj_spec.spectrum
-    ;BAspec_backwards=BAobj_spec.spectrum
-
-    ;Flip the spectra
-    ABspec=reverse(ABspec_backwards)
-    ;BAspec=reverse(BAspec_backwards)
-
-        ;Read in and flip errors
-    ABerr=reverse(ABobj_spec.sigma)
-    ;BAerr=reverse(BAobj_spec.sigma)
-
-    ;Get MJD
-    ABhead=ABobj_spec.header
-    ;BAhead=BAobj_spec.header
-
-    ;Normalize the model spectrum and the observed spectrum
-    ABnorm=continuum_fit(dindgen(npix), ABspec, low_rej=low_reject, high_rej=high_reject)
-    ;BAnorm=continuum_fit(dindgen(npix), BAspec, low_rej=low_reject, high_rej=high_reject)
-    
-    ;Populate arrays
-    ;spectra
-    ABspec_arr[f,*]=ABspec/ABnorm
-    ;BAspec_arr[f,*]=BAspec/BAnorm
-    ;errors
-    ABerr_arr[f,*]=ABerr/ABnorm
-    ;BAerr_arr[f,*]=BAerr/BAnorm
-    ;MJD
-    ABmjd_arr[f]=sxpar(ABhead, 'MJD')
-    ;BAmjd_arr[f]=sxpar(BAhead, 'MJD')
-
-endfor
-
-;Read flat files and flip and normalize them too    
-
-; ABflat_spec=mrdfits(ABflat_file, 1)
-; BAflat_spec=mrdfits(BAflat_file, 1)
-
-; ABflat_backwards=ABflat_spec.NH3_spectrum
-; BAflat_backwards=BAflat_spec.NH3_spectrum
-
-; Flip
-; ABflat=reverse(ABflat_backwards)
-; BAflat=reverse(BAflat_backwards)
-
-; Normalize
-; ABflatnorm=continuum_fit(dindgen(npix), ABflat, low_rej=low_reject, high_rej=high_reject)
-; BAflatnorm=continuum_fit(dindgen(npix), BAflat, low_rej=low_reject, high_rej=high_reject)
-
-; Make array
-; ABflat_arr=rebin(reform(ABflat/ABflatnorm, 1, npix), n_ABobj, npix)
-; BAflat_arr=rebin(reform(BAflat/BAflatnorm, 1, npix), n_BAobj, npix)
-
-
-; ;;;;;;;
-; Divide spec by flat
-; ABtemp1=ABspec_arr/ABflat_arr
-; BAtemp1=BAspec_arr/BAflat_arr
-
-; Take median
-; ABtemp_rough=median(ABtemp1, dimension=1, /double)
-; BAtemp_rough=median(BAtemp1, dimension=1, /double)
-
-;;;;;;;
-
+ircsrv_readobs, object=object, epoch=epoch, trace=trace, spectra=spectra, errors=errors, mjds=mjds, headers=headers
 
 
 common rvinfo, wl_soln, wl_soln_full, samp_index, wl_soln_over_full, int_lab_over_full, int_obs, lsf, npix_lsf, npix_model, firstpix, npixselect, oversamp, nnorm, err, visual, npix_trim_start, npix_trim_end, mintype, nparam_other, last_guess, nlines, COwl_shift, h2o, co2ch4, tellwl, visit, iter, template_residuals, res, stellar_template, stellar_template_over, finalplot, int_lab, wl_lab, lab_depth_switch, norm_switch
@@ -667,7 +517,7 @@ if template_start ne 0 then begin
     
     ;Downsample to IRCS res
     tophat=replicate(1d0/oversamp,oversamp)
-    stell_avg=convol(stellar_template_over, tophat)
+    stell_avg=downsample_tophat(stellar_template_over, oversamp)
     samp_index_full=lindgen(n_elements(wl_soln_full))*oversamp+(oversamp/2)
     stellar_template=stell_avg[samp_index_full]
     
