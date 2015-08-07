@@ -6,7 +6,8 @@ npix=1024L
 model_tag=ex2.model_tag
 ;if n_elements(model_out_tag) eq 0 then model_out_tag=model_tag
 
-initial_file='/home/stgilhool/RV_projects/IRCS_rv/data/rvshift1_results/GJ273_18Jan2011_AB_0_1023_Jun19_tapaspar_mpfit.fits'
+;initial_file='/home/stgilhool/RV_projects/IRCS_rv/data/rvshift1_results/GJ273_18Jan2011_AB_0_1023_Jun19_tapaspar_mpfit.fits'
+initial_file='/home/stgilhool/RV_projects/IRCS_rv/data/epoch/18Jan2011/calib_results/5_2_0_6_best.fits'
 new_output_file='/home/stgilhool/RV_projects/IRCS_rv/data/rvshift1_results/rvfit_'+model_out_tag+'_allexp.fits'
 output_base='/home/stgilhool/RV_projects/IRCS_rv/data/rvshift1_results/rvfit_'+model_out_tag
 
@@ -19,7 +20,7 @@ for visit=0,12 do begin
     
         first_pix=first_first_pix + i*pix_step
         
-        ircsrv_rvjul14, first_pix=first_pix, visit=visit+1, output_file=output_file, initial_file=initial_file, _EXTRA=ex2
+        ircsrv_rvjul14, first_pix=first_pix, visit=visit+1, output_file=output_file,initial_file=initial_file, _EXTRA=ex2
 
     endfor
 endfor

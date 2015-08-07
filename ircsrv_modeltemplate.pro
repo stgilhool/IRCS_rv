@@ -196,7 +196,7 @@ else message, 'incorrect min_type... cannot return a chi2 value'
 end
 
 
-pro ircsrv_modeltemplate, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, min_type=min_type, lab_depth=lab_depth, norm=norm, model_tag=model_tag, telluric_option=telluric_option, temp_file=temp_file, chi2_tol=chi2_tol, smooth_opt=smooth_opt, calib_model=calib_model
+pro ircsrv_modeltemplate, epoch=epoch, object=object, trace=trace, visualize=visualize, first_pix=first_pix, npix_select=npix_select, min_type=min_type, lab_depth=lab_depth, norm=norm, model_tag=model_tag, telluric_option=telluric_option, temp_file=temp_file, chi2_tol=chi2_tol, smooth_opt=smooth_opt, calib_file=calib_file
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;MAIN BODY ;;;;;;;;;;;;;;;;;;;
@@ -248,10 +248,12 @@ outputpath=epochpath+'rv_results/'
 ;outpath=p.tempfold
 ;modelpath=p.dataroot+'supplemental/'
 
+calib_ext = 2
+if n_elements(calib_file) eq 0 then calib_file=calibpath+'5_2_0_6_best.fits'
 
-if n_elements(calib_model) eq 0 then calib_model=calibpath+'5_2_0_6_best.fits'
+ircsrv_readobs, object=object, epoch=epoch, trace=trace, spectra=ABspec_arr, errors=ABerr_arr, mjds=ABmjd_arr, headers=headers
 
-ircsrv_readobs, object=object, epoch=epoch, trace=trace, spectra=spectra, errors=errors, mjds=mjds, headers=headers
+n_ABobj = n_elements(ABmjd_arr)
 
 
 common rvinfo, wl_soln, wl_soln_full, samp_index, wl_soln_over_full, int_lab_over_full, int_obs, lsf, npix_lsf, npix_model, firstpix, npixselect, oversamp, nnorm, err, visual, npix_trim_start, npix_trim_end, mintype, nparam_other, last_guess, nlines, COwl_shift, h2o, co2ch4, tellwl, visit, iter, template_residuals, res, stellar_template, stellar_template_over, finalplot, int_lab, wl_lab, lab_depth_switch, norm_switch
@@ -266,7 +268,7 @@ mintype=min_type
 
 
 ;Read in calibration results
-calibinfo_all = mrdfits(calib_model, 2)
+calibinfo_all = mrdfits(calib_file, calib_ext)
 
 used_ind = where(calibinfo_all.used eq 1, parcount)
 
@@ -310,7 +312,7 @@ endelse
 finalplot=0
 
 ;Other parameters and constants
-oversamp=model_par.oversamp
+oversamp=7 ;FIX: UNHARDCODE THIS
 npix_lsf=(oversamp*10L)+1L
 c=299792458.D
 
@@ -399,6 +401,7 @@ n_ABobj=n_ABobj-1
 ABspec_arr=ABspec_arr[1:*,*]
 ABerr_arr=ABerr_arr[1:*,*]
 ABmjd_arr=ABmjd_arr[1:*,*]
+headers=headers[1:*,*]
 
 
 ;;;;
@@ -415,9 +418,10 @@ for visit=0, n_ABobj-1 do begin
     bigc=299792458d0 ;m/s
     
 ;get header
-    struct=mrdfits(ABobj_file[visit], 1)
-    head=struct.header
+
+    head=headers[visit].head
 ;get bcv correction
+
     bcvcorr_ircs, head, params
     bcv=params[0]
     if visit eq 0 then bcv0=bcv
@@ -447,9 +451,10 @@ for visit=0, n_ABobj-1 do begin
     
 ;Define inputs to modeling function
     ftol=1d-10
-    
-    if model_input eq 1 then begin
-        model_in	= parinfo_readin(model_input)
+
+;ADD THIS LATER    
+;    if model_input eq 1 then begin
+;        model_in	= parinfo_readin(model_input)
     
     
     if telluric_option eq 0 then begin
@@ -475,9 +480,11 @@ for visit=0, n_ABobj-1 do begin
     
     
     if norm ne 0 then begin
-        nnorm=2 > npix_select/50
-        norm_guess=replicate(1d0,nnorm)
-        norm_scale=replicate(0.1d0,nnorm)
+;        nnorm=2 > npix_select/50
+        nnorm 		= n_k
+        norm_guess	= norm_pts
+        ;norm_guess=replicate(1d0,nnorm)
+        norm_scale=replicate(0.01d0,nnorm)
         
         guess=[guess, norm_guess]
         scale=[scale, norm_scale]
@@ -501,7 +508,7 @@ for visit=0, n_ABobj-1 do begin
     nparam_total=n_elements(guess)
     
     parinfo = replicate({limited:[1,1], $
-                         limits:[0.D,1.D], mpside:0}, nparam_total)
+                         limits:[0.D,1.D], mpside:2}, nparam_total)
 ;parinfo[2:2+nnorm-1].limits=[0.85d0,1.15d0]            
 
 ;READ IN PHOENIX TEMPLATE AS A STARTING GUESS
@@ -516,10 +523,9 @@ if template_start ne 0 then begin
     stellar_template_over=interpol(stellar_template_over, wl_shifted, wl_soln_over_full)
     
     ;Downsample to IRCS res
-    tophat=replicate(1d0/oversamp,oversamp)
-    stell_avg=downsample_tophat(stellar_template_over, oversamp)
-    samp_index_full=lindgen(n_elements(wl_soln_full))*oversamp+(oversamp/2)
-    stellar_template=stell_avg[samp_index_full]
+
+    stellar_template =downsample_tophat(stellar_template_over, oversamp)
+
     
 endif else stellar_template_over=replicate(1d0, n_elements(wl_soln_over))
 best_template=stellar_template_over
@@ -709,9 +715,9 @@ free_lun, lun1
                 CALIB_FILE:calib_file, $
                 CALIB_EXT:calib_ext, $
                 WL_COEFF:wl_coeff, $
-                GH0_COEFF:gh_coeff_out, $
-                GH1_COEFF:gh_lin_coeff_out, $
-                OTHER_COEFF:other, $
+                GH0_COEFF:gh_coeff, $
+                GH1_COEFF:gh_lin_coeff, $
+;                K_COEFF:norm_pts_y, $
                 OVERSAMP:oversamp, $
                 FTOL:ftol, $
                 NPIX_TRIM_START:npix_trim_start, $

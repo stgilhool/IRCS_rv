@@ -1,4 +1,4 @@
-pro q_wrap_big_jul14, make_template=make_template
+pro q_wrap_big_aug3, make_template=make_template
 
 if n_elements(make_template) eq 0 then make_template=0
 
@@ -7,18 +7,18 @@ if n_elements(make_template) eq 0 then make_template=0
 description=''
 
 ;;;EXTRA FOR BOTH
-model_tag='Jul14kstest13exp'
-model_out_tag='Jul14kstest13exp1' ;FOR FITTING ONLY, ACTUALLY
+model_tag='newpipe'
+model_out_tag='newpipe_mp1' ;FOR FITTING ONLY, ACTUALLY
 telluric_option=3 ;0-original telluric 3-TAPAS
 
 ;;;EXTRA for template caller
-min_type='amoeba'
+min_type='mpfit'
 lab_depth=0
 norm=0
 temp_file='../data/epoch/18Jan2011/temp_results/phoenix_template.fits'
 chi2_tol=0.03
 smooth_opt=0
-visualize=0
+visualizet=1
 
 ;;;EXTRA for q_wrap
 run=1
@@ -26,8 +26,8 @@ npix_select=128L
 n_bases_lsf=1L
 n_other=3L
 s_template_num=9 ;template corresponding to tag
-fmode='amoeba'
-visualize=0
+fmode='mpfit'
+visualizeq=1
 
 ;;;KEYWORDS for q_wrap
 first_first_pix=0L
@@ -41,7 +41,7 @@ ex={min_type:min_type, $
     chi2_tol:chi2_tol, $
     smooth_opt:smooth_opt, $
     telluric_option:telluric_option, $
-    visualize:visualize, $
+    visualize:visualizet, $
     model_tag:model_tag $
     }
 
@@ -54,7 +54,7 @@ ex2={run:run, $
      s_template_num:s_template_num, $
      telluric_option:telluric_option, $
      fmode:fmode, $
-     visualize:visualize, $
+     visualize:visualizeq, $
      model_tag:model_tag $
      }
 
@@ -84,7 +84,7 @@ free_lun, lun
 
 if make_template eq 0 and file_test( '../data/epoch/18Jan2011/temp_results/template_'+model_tag+'.fits') eq 0 then message, "Template corresponding to model_tag does not exist.  Check model_tag, or turn on /make_template option"
 
-if make_template then template_caller_jul14, _EXTRA=ex
+if make_template then template_caller_aug3, _EXTRA=ex
 
 
 ;q_wrap_jul1, first_first_pix=first_first_pix, pix_step=pix_step, model_tag_out=model_out_tag, _EXTRA=ex2

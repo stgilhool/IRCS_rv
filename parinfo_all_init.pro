@@ -109,10 +109,17 @@ function parinfo_getindex, parinfo_str, all=all, used=used, free=free
 ;used finds indices for params with used = 1
 
 if n_elements(all) eq 0 then all = 0
-if n_elements(free) eq 0 then free = 1
-if n_elements(used) eq 0 then used = 0
 
-if total([all,free,used]) gt 1 then message, 'choose all or used or free'
+if n_elements(used) eq 0 then used = 0
+if n_elements(free) eq 0 then free = 0
+
+;ensure that only 1 option is set, and assign default if none is
+if total([all,free,used]) eq 0 then begin
+    print, "Setting free as default setting"
+    free = 1
+endif else if total([all,free,used]) gt 1 then message, 'choose all or used or free'
+;
+
 
 if all eq 0 then begin
     if used eq 1 then ind = where(parinfo_str.used eq 1, parcount)$
@@ -128,6 +135,8 @@ rvi	= where(strmatch(parnames, 'd_rv *') eq 1, n_rv)
                                 ;;Get wl vectors
 wli	= where(strmatch(parnames, 'wl[0-4]*') eq 1, n_wl)
 
+d_wli	= where(strmatch(parnames, 'd_wl[0-2]*') eq 1, n_d_wl)
+
                                 ;;Get constant lsf params
 ghi	= where(strmatch(parnames, 'gh[0-9]*') eq 1, n_gh)
 
@@ -140,8 +149,8 @@ ti	= where(strmatch(parnames, 't\_*') eq 1, n_t)
                                 ;;Get norm params
 ki	= where(strmatch(parnames, 'k[0-9]*') eq 1, n_k)
 
-outstr 	= {rvi:rvi, wli:wli, ghi:ghi, d_ghi:d_ghi, ti:ti, ki:ki, $
-           n_rv:n_rv, n_wl:n_wl, n_gh:n_gh, n_d_gh:n_d_gh, $
+outstr 	= {rvi:rvi, wli:wli, d_wli:d_wli, ghi:ghi, d_ghi:d_ghi, ti:ti, ki:ki, $
+           n_rv:n_rv, n_wl:n_wl, n_d_wl:n_d_wl, n_gh:n_gh, n_d_gh:n_d_gh, $
            n_t:n_t, n_k:n_k}
 
 return, outstr

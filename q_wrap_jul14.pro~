@@ -19,7 +19,7 @@ for visit=0,12 do begin
     
         first_pix=first_first_pix + i*pix_step
         
-        ircsrv_rvjul14, first_pix=first_pix, visit=visit, output_file=output_file, initial_file=initial_file, _EXTRA=ex2
+        ircsrv_rvjul14, first_pix=first_pix, visit=visit+1, output_file=output_file, initial_file=initial_file, _EXTRA=ex2
 
     endfor
 endfor

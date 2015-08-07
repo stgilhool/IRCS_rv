@@ -7,12 +7,12 @@ if n_elements(make_template) eq 0 then make_template=0
 description=''
 
 ;;;EXTRA FOR BOTH
-model_tag='Jul14kstest13exp'
-model_out_tag='Jul14kstest13expmp1' ;FOR FITTING ONLY, ACTUALLY
+model_tag=''
+model_out_tag='' ;FOR FITTING ONLY, ACTUALLY
 telluric_option=3 ;0-original telluric 3-TAPAS
 
 ;;;EXTRA for template caller
-min_type='amoeba'
+min_type='mpfit'
 lab_depth=0
 norm=0
 temp_file='../data/epoch/18Jan2011/temp_results/phoenix_template.fits'
