@@ -1,9 +1,0 @@
-pro headfits, filename, extension
-
-if n_params() eq 1 then extension=0
-
-f=mrdfits(filename, extension)
-
-help, f
-
-end
