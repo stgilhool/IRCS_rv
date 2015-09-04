@@ -1,0 +1,8 @@
+pro ircsrv_templategenerate, model_tag
+
+if n_elements(model_tag) eq 0 then model_tag='default'
+
+ phoenix_file='/home/stgilhool/RV_projects/IRCS_rv/data/epoch/18Jan2011/temp_results/phoenix_template.fits'
+
+stellar_template_over=ttt.template
+    stellar_wl=ttt.wl_soln

@@ -1,0 +1,46 @@
+function rv_make_model, nh3, h2o, co2ch4, star, lsf, norm_vector
+;+
+; NAME: rv_make_model
+;
+; PURPOSE: Make a model observation from nh3, telluric, and stellar models
+; convolved with an LSF and corrected for normalization errors
+;
+;
+; CATEGORY:
+;
+; CALLING SEQUENCE: model=rv_make_model(nh3, h2o, co2ch4o, star, lsf, norm_vector)
+;
+; INPUTS: 
+;
+; OPTIONAL INPUTS:
+;
+; KEYWORD PARAMETERS:
+;
+; OUTPUTS:
+;
+;
+; OPTIONAL OUTPUTS:
+;
+;
+; COMMON BLOCKS:
+;
+;
+; SIDE EFFECTS:
+;
+;
+; RESTRICTIONS:
+;
+;
+; PROCEDURE:
+;
+;
+; EXAMPLE:
+;
+;
+; MODIFICATION HISTORY:
+;
+;-
+
+;;;Add section to check inputs
+
+;;;Multiply 

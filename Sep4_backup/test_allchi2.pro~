@@ -1,0 +1,29 @@
+; IDL Version 8.2.2 (linux x86_64 m64)
+; Journal File for stgilhool@iroquois.physics.upenn.edu
+; Working directory: /RAID/home/stgilhool/RV_projects/IRCS_rv/IDL_pros
+; Date: Thu Mar 12 07:57:03 2015
+ 
+file='/home/stgilhool/RV_projects/IRCS_rv/data/telluric_test/test7/tellurictest.fits'
+fits_info, file, n_ext=n_ext, /silent
+a=mrdfits(file, 1)
+;MRDFITS: Binary table.  25 columns by  1 rows.
+help, a
+n_exp=n_elements(h2o_depth_guess)
+for i=0, n_exp-1 do begin & $
+endfor
+chi2_arr=dblarr(n_exp)
+; % Array dimensions must be greater than 0.
+n_exp=n_elements(a.h2o_depth_guess)
+chi2_arr=dblarr(n_exp)
+for i=0, n_exp-1 do begin & $
+chi2_arr[i]=total(((model_arr[*,i]-obs_arr[*,i])/err_arr[*,i])^2, /double) & $
+endfor
+; % Variable is undefined: MODEL_ARR.
+for i=0, n_exp-1 do begin & $
+chi2_arr[i]=total(((a.model_arr[*,i]-a.obs_arr[*,i])/a.err_arr[*,i])^2, /double) & $
+endfor
+print, chi2_arr
+;       5032.3304       4366.5998       2227.1508       3153.0861       2360.9693       1507.7059       3257.5136       1861.7095
+;       2404.8102       2472.8403
+end
+; % Syntax error.

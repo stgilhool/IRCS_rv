@@ -1,0 +1,55 @@
+function ircsrv_convolve_3d, v1, lsf, oversamp=oversamp, first_pix=first_pix, npix_select=npix_select
+;take the LSF array (lsf, pixel) and convolves it with an oversampled
+;spectrum.  Returns the oversampled output, padded with 1's at each
+;end, if necessary (because of edge effects)
+
+;Keywords
+npix=1024L ;CAUTION this needs to be tuned for non-IRCS data sets
+if n_elements(oversamp) eq 0 then oversamp=7L
+if n_elements(first_pix) eq 0 then first_pix=0L
+if n_elements(npix_select) eq 0 then npix_select=npix-first_pix
+
+;Constant defs
+npix_model=npix_select*oversamp
+npix_lsf=oversamp*10L+1L
+
+v1size=size(v1)
+lsfsize=size(lsf)
+;set n_dims
+n_dim_v1=v1size[0]
+n_dim_lsf=lsfsize[0]
+;set dims
+dim_v1=lindgen(n_dim_v1)+1
+dim_lsf=lindgen(n_dim_lsf)+1
+
+;check that lsf is 1d bigger than v1
+if n_dim_lsf ne n_dim_v1 then message, "LSF must be 1D bigger than spectrum"
+;check that v1 is at least 1d long
+if n_dim_v1 le 0 then message, "Spectrum not defined"
+;check that v1 is long enough
+if dim_v1[0] lt dim_lsf[1] then print, "WARNING: LSF is longer than spectrum"
+;check that the correct dims match
+;if dim_lsf[2:*] ne dim_v1[1:*] then message, "LSF and spectrum dimensions don't agree"
+
+;Initialize some arrays for re-sorting of intensity vector
+npix_spectrum=dim_v1[0]
+npix_lsf=dim_lsf[0]
+npix_model=dim_lsf[1]
+int_conv=dblarr(dim_lsf[1:*])
+int_conv_mtx=dblarr(dim_lsf)
+
+
+
+for index=0,npix_model-1 do begin
+    model_index=index+first_pix*oversamp
+    if model_index lt (npix_lsf/2) or model_index gt (npix_spectrum-1-(npix_lsf/2)) then $
+      int_conv_mtx[*,index]=replicate(1d0, npix_lsf) $
+    else int_conv_mtx[*,index]=v1[model_index-(npix_lsf/2):model_index+(npix_lsf/2)]
+endfor
+int_conv_temp=int_conv_mtx*lsf
+int_conv=total(int_conv_temp, 1, /double)
+
+
+return, int_conv
+
+end

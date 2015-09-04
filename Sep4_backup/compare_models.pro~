@@ -1,0 +1,19 @@
+pro compare_models, model_1, model_2
+
+readcol, 'model_info.dat', chi2, DoF
+
+
+;;;Print final results for a given file
+index_1=model_1-1
+index_2=model_2-1
+chi2_1=chi2[index_1]
+DoF_1=DoF[index_1]
+DoF_2=DoF[index_2]
+F_crit=((chi2_1-chi2_2)/(DoF_1-DoF_2))/(chi2_2/DoF_2)
+prob=mpftest(F_crit, DoF_1-DoF_2, DoF_2)
+
+print, "Replace model ", model_1," with model ", model_2
+print, "F_value: ", F_crit
+print, "Prob : ", prob
+
+end

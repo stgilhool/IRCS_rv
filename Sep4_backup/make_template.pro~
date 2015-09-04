@@ -1,0 +1,101 @@
+pro make_template, epoch, object
+
+;set file paths
+rootpath='/home/stgilhool/RV_projects/IRCS_rv/data/'
+epochpath=rootpath+'epoch/'+epoch+'/'
+objectpath=epochpath+'final_spectra/'
+flatpath=epochpath+'final_spectra/'
+
+;Define flat file names and full path file names
+ABflat_filename=strjoin(['NH3', object, epoch, 'AB1'], '_')+'.fits'
+BAflat_filename=strjoin(['NH3', object, epoch, 'BA1'], '_')+'.fits'
+ABflat_file=flatpath+strjoin(['NH3', object, epoch, 'AB1'], '_')+'.fits'
+BAflat_file=flatpath+strjoin(['NH3', object, epoch, 'BA1'], '_')+'.fits'
+
+
+;Define object file names and full path file names
+ABobj_listname=strjoin([object, epoch, 'AB'], '_')+'.list'
+BAobj_listname=strjoin([object, epoch, 'BA'], '_')+'.list'
+ABobj_list=objectpath+strjoin([object, epoch, 'AB'], '_')+'.list'
+ABobj_list=objectpath+strjoin([object, epoch, 'AB'], '_')+'.list'
+
+
+;Read in object filenames and then spectra
+readcol, ABobj_list, ABobj_filename, format='A'
+readcol, BAobj_list, BAobj_filename, format='A'
+
+ABobj_file=objectpath+ABobj_filename
+BAobj_file=objectpath+BAobj_filename
+
+n_ABobj=n_elements(ABobj_file)
+n_BAobj=n_elements(BAobj_file)
+
+
+;Initialize arrays of spectra
+temp_str=mrdfits(ABobj_file[0], 1)
+temp_spectrum=temp_str.spectrum
+npix=n_elements(temp_spectrum)
+ABspec_arr=dblarr(n_ABobj, npix)
+BAspec_arr=dblarr(n_BAobj, npix)
+ABflat_arr=dblarr(n_ABobj, npix)
+BAflat_arr=dblarr(n_BAobj, npix)
+
+
+;Set continuum normalization params
+low_reject=0.53
+high_reject=3.0
+
+;Loop through each object file and flip and normalize it
+for f=0, n_ABobj-1 do begin
+    ABobj_spec=mrdfits(ABobj_file[f], 1)
+    BAobj_spec=mrdfits(BAobj_file[f], 1)
+
+    ABspec_backwards=ABobj_spec.spectrum
+    BAspec_backwards=BAobj_spec.spectrum
+
+    ;Flip the spectra
+    ABspec=reverse(ABspec_backwards)
+    BAspec=reverse(BAspec_backwards)
+
+    ;Normalize the model spectrum and the observed spectrum
+    ABnorm=continuum_fit(dindgen(npix), ABspec, low_rej=low_reject, high_rej=high_reject)
+    BAnorm=continuum_fit(dindgen(npix), BAspec, low_rej=low_reject, high_rej=high_reject)
+
+    ABspec_arr[f,*]=ABspec/ABnorm
+    BAspec_arr[f,*]=BAspec/BAnorm
+
+endfor
+
+;Read flat files and flip and normalize them too    
+
+ABflat_spec=mrdfits(ABflat_file, 1)
+BAflat_spec=mrdfits(BAflat_file, 1)
+
+ABflat_backwards=ABflat_spec.NH3_spectrum
+BAflat_backwards=BAflat_spec.NH3_spectrum
+
+;Flip
+ABflat=reverse(ABflat_backwards)
+BAflat=reverse(BAflat_backwards)
+
+;Normalize
+ABflatnorm=continnum_fits(dindgen(npix), ABflat, low_rej=low_reject, high_rej=high_reject)
+BAflatnorm=continnum_fits(dindgen(npix), BAflat, low_rej=low_reject, high_rej=high_reject)
+
+;Make array
+ABflat_arr=rebin(reform(ABflat/ABflatnorm, 1, npix), n_ABobj, npix)
+BAflat_arr=rebin(reform(BAflat/BAflatnorm, 1, npix), n_BAobj, npix)
+
+
+;;;;;;;;
+;Divide spec by flat
+ABtemp1=ABspec_arr/ABflat_arr
+BAtemp1=BAspec_arr/BAflat_arr
+
+;Take median
+ABtemp_rough=median(ABtemp1, dimension=1, /double)
+BAtemp_rough=median(BAtemp1, dimension=1, /double)
+
+stop
+
+end
